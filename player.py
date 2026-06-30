@@ -2,29 +2,24 @@ import pygame
 import math
 import random
 
-PLAYER_IMG = None
 font_bullet = None
 BULLET_0_IMG = None
 BULLET_1_IMG = None
 
 def init_player_assets():
-    global PLAYER_IMG, font_bullet, BULLET_0_IMG, BULLET_1_IMG
+    global font_bullet, BULLET_0_IMG, BULLET_1_IMG
     try:
-        PLAYER_IMG = pygame.image.load("assets/player.png").convert_alpha()
-        PLAYER_IMG = pygame.transform.scale(PLAYER_IMG, (64, 64))
-    except Exception as e:
-        print("No se pudo cargar la imagen del jugador:", e)
-        
-    try:
-        font_bullet = pygame.font.Font("assets/VT323-Regular.ttf", 32)
+        font_bullet = pygame.font.Font("assets/fonts/VT323-Regular.ttf", 32)
     except:
         font_bullet = pygame.font.SysFont("Consolas", 24)
         
     try:
-        b0 = pygame.image.load("assets/0.png").convert_alpha()
+        b0 = pygame.image.load("assets/images/player/0.png").convert_alpha()
         BULLET_0_IMG = pygame.transform.scale(b0, (24, 24))
-        
-        b1 = pygame.image.load("assets/1.png").convert_alpha()
+    except:
+        BULLET_0_IMG = None
+    try:
+        b1 = pygame.image.load("assets/images/player/1.png").convert_alpha()
         BULLET_1_IMG = pygame.transform.scale(b1, (24, 24))
     except Exception as e:
         print("No se pudieron cargar los sprites de bala:", e)
@@ -33,7 +28,7 @@ class Player:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.radius = 24 # Aumentamos el radio de colisión porque el sprite es más grande
+        self.radius = 30 # Escalado 1.5x
         self.speed = 5
         self.hp = 100
         self.max_hp = 100
@@ -44,9 +39,9 @@ class Player:
         self.shoot_cooldown = 0
         
         from animator import Animator
-        # Volvemos a la configuración original de 3 estados sin transpose
-        self.animator = Animator("assets/player_sheet.png", 64, 64, rows=3, cols=4, animation_speed=0.10)
-        self.state = 0 # 0: Idle, 1: Move, 2: Attack
+        # Tamaño escalado 1.5x (96x96)
+        self.animator = Animator("assets/images/player/player_sheet.png", 96, 96, rows=3, cols=4, animation_speed=0.10)
+        self.state = 0 # 0: Idle, 1: Walk, 2: Attack
         self.flip = False
 
     def move(self, keys, width, height):
@@ -101,7 +96,7 @@ class Player:
             if b.is_offscreen(width, height):
                 self.bullets.remove(b)
 
-    def draw(self, surface):
+    def draw(self, surface, offset_x=0, offset_y=0):
         self.animator.set_state(self.state)
         self.animator.update()
         image = self.animator.get_current_image()
@@ -109,14 +104,14 @@ class Player:
         if image:
             if getattr(self, 'flip', False):
                 image = pygame.transform.flip(image, True, False)
-            rect = image.get_rect(center=(int(self.x), int(self.y)))
+            rect = image.get_rect(center=(int(self.x + offset_x), int(self.y + offset_y)))
             surface.blit(image, rect)
         else:
-            pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), self.radius)
+            pygame.draw.circle(surface, self.color, (int(self.x + offset_x), int(self.y + offset_y)), self.radius)
             
         # Dibujar balas (lágrimas)
         for b in self.bullets:
-            b.draw(surface)
+            b.draw(surface, offset_x, offset_y)
 
 class Bullet:
     def __init__(self, x, y, angle):
@@ -139,23 +134,19 @@ class Bullet:
         self.x += self.dx
         self.y += self.dy
 
-    def draw(self, surface):
+    def draw(self, surface, offset_x=0, offset_y=0):
         if hasattr(self, 'image') and self.image:
-            rect = self.image.get_rect(center=(int(self.x), int(self.y)))
+            rect = self.image.get_rect(center=(int(self.x + offset_x), int(self.y + offset_y)))
             surface.blit(self.image, rect)
         else:
-            global font_bullet
-            if font_bullet is None:
-                font_bullet = pygame.font.SysFont("Consolas", 24)
+            pygame.draw.circle(surface, self.color, (int(self.x + offset_x), int(self.y + offset_y)), self.radius)
+            if font_bullet:
+                text_surf = font_bullet.render(self.text, True, self.color)
+                shadow = font_bullet.render(self.text, True, (0, 50, 50))
+                text_rect = text_surf.get_rect(center=(int(self.x + offset_x), int(self.y + offset_y)))
                 
-            text_surf = font_bullet.render(self.text, True, self.color)
-            
-            # Sombra para que resalte
-            shadow = font_bullet.render(self.text, True, (0, 50, 50))
-            text_rect = text_surf.get_rect(center=(int(self.x), int(self.y)))
-            
-            surface.blit(shadow, (text_rect.x + 2, text_rect.y + 2))
-            surface.blit(text_surf, text_rect)
+                surface.blit(shadow, (text_rect.x + 2, text_rect.y + 2))
+                surface.blit(text_surf, text_rect)
 
     def is_offscreen(self, w, h):
         return self.x < 0 or self.x > w or self.y < 0 or self.y > h

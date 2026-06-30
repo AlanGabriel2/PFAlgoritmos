@@ -116,8 +116,8 @@ class DagEngine:
                 continue
                 
             if node == "TIP10TEMTT1": # Mega-Candado (Habitación de Titulación)
-                # TEST/DEMO MODE: Desbloqueado desde el inicio para pruebas
-                self.state[node] = NodeState.UNLOCKED
+                if cleaned_count >= total_required:
+                    self.state[node] = NodeState.UNLOCKED
             else:
                 # Nodos normales
                 can_unlock = True

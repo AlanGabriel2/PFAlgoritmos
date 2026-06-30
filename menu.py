@@ -1,5 +1,6 @@
 import pygame
 import math
+import save_manager
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
 
 def draw_purple_cross_bg(surface, width, height, time_offset=0):
@@ -65,19 +66,14 @@ class DisclaimerScreen:
         self.font_md = font_md
         self.time = 0
         try:
-            self.save_img = pygame.image.load("assets/save.png").convert_alpha()
-            # Escalar a un tamaño razonable conservando su proporción original
-            if self.save_img.get_width() > 100:
-                ratio = self.save_img.get_width() / self.save_img.get_height()
-                new_w = 60
-                new_h = int(new_w / ratio)
-                self.save_img = pygame.transform.smoothscale(self.save_img, (new_w, new_h))
+            self.save_img = pygame.image.load("assets/images/ui/save.png").convert_alpha()
+            # Forzar un aspecto cuadrado (60x60) para corregir la percepción de anchura
+            self.save_img = pygame.transform.scale(self.save_img, (60, 60))
         except:
             self.save_img = None
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
-            return "NEXT"
+        # Ya no requiere presionar tecla, pasa por tiempo
         return None
 
     def draw(self, surface):
@@ -109,11 +105,6 @@ class DisclaimerScreen:
         desc_rect = desc.get_rect(center=(self.width // 2, self.height // 2 + 30))
         surface.blit(desc, desc_rect)
 
-        if (self.time // 30) % 2 == 0:
-            start_text = self.font_md.render("PRESIONA CUALQUIER TECLA", True, (150, 150, 150))
-            start_rect = start_text.get_rect(center=(self.width // 2, self.height - 100))
-            surface.blit(start_text, start_rect)
-
 class TitleScreen:
     def __init__(self, width, height, font_title, font_md):
         self.width = width
@@ -122,14 +113,14 @@ class TitleScreen:
         self.font_md = font_md
         self.time = 0
         try:
-            self.title_img = pygame.image.load("assets/titulo_juego.png").convert_alpha()
+            self.title_img = pygame.image.load("assets/images/ui/titulo_juego.png").convert_alpha()
             self.title_img = pygame.transform.scale(self.title_img, (950, 518)) # Más grande
         except:
             self.title_img = None
             
         try:
-            self.bg_img = pygame.image.load("assets/bg_portada.jpg").convert()
-            self.bg_img = pygame.transform.scale(self.bg_img, (self.width, self.height))
+            self.bg_img = pygame.image.load("assets/images/backgrounds/bg_portada.jpg").convert()
+            self.bg_img = pygame.transform.scale(self.bg_img, (width, height))
         except:
             self.bg_img = None
         
@@ -183,13 +174,14 @@ class MainMenu:
         self.notification = ""
         self.notification_timer = 0
         try:
-            self.title_img = pygame.image.load("assets/titulo_juego.png").convert_alpha()
-            self.title_img = pygame.transform.scale(self.title_img, (600, 327))
+            self.title_img = pygame.image.load("assets/images/ui/titulo_juego.png").convert_alpha()
+            # Escalar si es necesario
+            self.title_img = pygame.transform.scale(self.title_img, (600, 200))
         except:
             self.title_img = None
             
         try:
-            self.bg_img_raw = pygame.image.load("assets/bg_portada.jpg").convert()
+            self.bg_img_raw = pygame.image.load("assets/images/backgrounds/bg_portada.jpg").convert()
             self.bg_w = int(self.width * 1.1)
             self.bg_h = int(self.height * 1.1)
             self.bg_img = pygame.transform.scale(self.bg_img_raw, (self.bg_w, self.bg_h))
@@ -200,10 +192,14 @@ class MainMenu:
     @property
     def current_options(self):
         opts = []
+        has_any_save = any(save_manager.has_save(i) for i in range(1, 4))
         for opt in self.options:
             opts.append(opt)
             if opt == "Jugar" and self.jugar_expanded:
-                opts.extend(["  Continuar Partida", "  Nueva Partida", "  Cargar Partida"])
+                if has_any_save:
+                    opts.extend(["  Continuar Partida", "  Nueva Partida", "  Cargar Partida"])
+                else:
+                    opts.extend(["  Nueva Partida", "  Cargar Partida"])
         return opts
 
     def unlock_bestiary(self):
@@ -271,15 +267,23 @@ class MainMenu:
 
         opts = self.current_options
         for i, option in enumerate(opts):
+            is_submenu = option.startswith("  ")
+            display_text = option.strip()
+            
             if i == self.selected_index:
-                color = (255, 255, 255)
-                text = self.font_md.render("> " + option + " <", True, color)
-                shadow = self.font_md.render("> " + option + " <", True, (150, 0, 150))
+                if is_submenu:
+                    color = (220, 220, 220)
+                    text = self.font_md.render("- " + display_text + " -", True, color)
+                    shadow = self.font_md.render("- " + display_text + " -", True, (100, 100, 100))
+                else:
+                    color = (255, 255, 255)
+                    text = self.font_md.render("> " + display_text + " <", True, color)
+                    shadow = self.font_md.render("> " + display_text + " <", True, (150, 0, 150))
             else:
                 color = (180, 130, 210)
-                if option.startswith("  "):
-                    color = (200, 200, 200)
-                text = self.font_md.render(option, True, color)
+                if is_submenu:
+                    color = (130, 130, 130) # Un poco más opaco/oscuro para submenu
+                text = self.font_md.render(display_text, True, color)
                 
             rect = text.get_rect(center=(self.width // 2, self.height // 2 + i * 45))
             if i == self.selected_index:
@@ -346,15 +350,36 @@ class SlotSelectMenu:
         self.mode = mode # "NUEVA" o "CARGAR"
         self.options = ["Slot 1", "Slot 2", "Slot 3", "Regresar"]
         self.selected_index = 0
+        self.confirming_slot = None
+        self.confirm_index = 0
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
+            if self.confirming_slot:
+                if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+                    self.confirm_index = 1 - self.confirm_index
+                elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                    if self.confirm_index == 1:
+                        return self.confirming_slot
+                    else:
+                        self.confirming_slot = None
+                elif event.key == pygame.K_ESCAPE:
+                    self.confirming_slot = None
+                return None
+            
             if event.key == pygame.K_UP:
                 self.selected_index = (self.selected_index - 1) % len(self.options)
             elif event.key == pygame.K_DOWN:
                 self.selected_index = (self.selected_index + 1) % len(self.options)
             elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
-                return self.options[self.selected_index]
+                selection = self.options[self.selected_index]
+                if selection.startswith("Slot ") and self.mode == "NUEVA":
+                    slot_num = int(selection.split(" ")[1])
+                    if self.save_manager.has_save(slot_num):
+                        self.confirming_slot = selection
+                        self.confirm_index = 0 # Default to No
+                        return None
+                return selection
             elif event.key == pygame.K_ESCAPE:
                 return "Regresar"
         return None
@@ -364,7 +389,21 @@ class SlotSelectMenu:
         overlay.fill((0, 0, 0, 220))
         surface.blit(overlay, (0, 0))
         
-        t_str = "SOBREESCRIBIR PARTIDA" if self.mode == "NUEVA" else "CARGAR PARTIDA"
+        if self.confirming_slot:
+            warn_t1 = self.font_md.render(f"¿Seguro que quieres sobreescribir el {self.confirming_slot}?", True, (255, 100, 100))
+            warn_t2 = self.font_md.render("No podras recuperar la partida actual.", True, (200, 200, 200))
+            surface.blit(warn_t1, warn_t1.get_rect(center=(self.width // 2, self.height // 2 - 30)))
+            surface.blit(warn_t2, warn_t2.get_rect(center=(self.width // 2, self.height // 2 + 10)))
+            
+            opts = ["NO", "SI"]
+            for idx, opt in enumerate(opts):
+                color = (255, 255, 255) if idx == self.confirm_index else (150, 150, 150)
+                text = self.font_md.render(f"> {opt} <" if idx == self.confirm_index else opt, True, color)
+                rect = text.get_rect(center=(self.width // 2 - 60 + idx * 120, self.height // 2 + 80))
+                surface.blit(text, rect)
+            return
+
+        t_str = "NUEVA PARTIDA" if self.mode == "NUEVA" else "CARGAR PARTIDA"
         title = self.font_lg.render(t_str, True, (255, 255, 255))
         title_rect = title.get_rect(center=(self.width // 2, self.height // 4))
         surface.blit(title, title_rect)
@@ -473,18 +512,19 @@ class BestiaryMenu:
         
         # Load assets
         try:
-            self.bg_img = pygame.image.load("assets/bestiary_bg.png").convert()
+            self.bg_img = pygame.image.load("assets/images/ui/bestiary_bg.png").convert()
+            self.bg_img = pygame.transform.scale(self.bg_img, (self.width, self.height))
             
-            arr_l = pygame.image.load("assets/arrow_left.png").convert_alpha()
-            self.arrow_left_img = pygame.transform.scale(arr_l, (64, 64))
+            arr_l = pygame.image.load("assets/images/ui/arrow_left.png").convert_alpha()
+            self.arrow_left = pygame.transform.scale(arr_l, (64, 64))
             
-            arr_r = pygame.image.load("assets/arrow_right.png").convert_alpha()
-            self.arrow_right_img = pygame.transform.scale(arr_r, (64, 64))
+            arr_r = pygame.image.load("assets/images/ui/arrow_right.png").convert_alpha()
+            self.arrow_right = pygame.transform.scale(arr_r, (64, 64))
         except Exception as e:
             print("Error loading bestiary assets:", e)
             self.bg_img = None
-            self.arrow_left_img = None
-            self.arrow_right_img = None
+            self.arrow_left = None
+            self.arrow_right = None
             
         self.left_rect = None
         self.right_rect = None
@@ -510,8 +550,7 @@ class BestiaryMenu:
 
     def draw(self, surface):
         if hasattr(self, 'bg_img') and self.bg_img:
-            bg_scaled = pygame.transform.scale(self.bg_img, (self.width, self.height))
-            surface.blit(bg_scaled, (0, 0))
+            surface.blit(self.bg_img, (0, 0))
         else:
             surface.fill((11, 11, 11))
         
@@ -564,17 +603,17 @@ class BestiaryMenu:
         surface.blit(name_text, name_text.get_rect(center=(self.width // 2, name_y)))
         
         # Draw Arrows
-        if hasattr(self, 'arrow_left_img') and self.arrow_left_img:
-            self.left_rect = self.arrow_left_img.get_rect(center=(left_arrow_x, self.height // 2))
-            surface.blit(self.arrow_left_img, self.left_rect)
+        if hasattr(self, 'arrow_left') and self.arrow_left:
+            self.left_rect = self.arrow_left.get_rect(center=(left_arrow_x, self.height // 2))
+            surface.blit(self.arrow_left, self.left_rect)
         else:
             left_arrow = self.font_lg.render("<", True, (255, 255, 255))
             self.left_rect = left_arrow.get_rect(center=(left_arrow_x, self.height // 2))
             surface.blit(left_arrow, self.left_rect)
             
-        if hasattr(self, 'arrow_right_img') and self.arrow_right_img:
-            self.right_rect = self.arrow_right_img.get_rect(center=(right_arrow_x, self.height // 2))
-            surface.blit(self.arrow_right_img, self.right_rect)
+        if hasattr(self, 'arrow_right') and self.arrow_right:
+            self.right_rect = self.arrow_right.get_rect(center=(right_arrow_x, self.height // 2))
+            surface.blit(self.arrow_right, self.right_rect)
         else:
             right_arrow = self.font_lg.render(">", True, (255, 255, 255))
             self.right_rect = right_arrow.get_rect(center=(right_arrow_x, self.height // 2))
@@ -633,7 +672,7 @@ class OptionsMenu:
         self.time = 0
         
         try:
-            self.bg_img = pygame.image.load("assets/config_bg.png").convert()
+            self.bg_img = pygame.image.load("assets/images/ui/config_bg.png").convert()
             self.bg_img = scale_to_cover(self.bg_img, self.width, self.height)
         except Exception as e:
             print("Failed to load config_bg:", e)
@@ -644,7 +683,7 @@ class OptionsMenu:
         self.height = h
         if hasattr(self, 'bg_img') and self.bg_img:
             try:
-                raw_bg = pygame.image.load("assets/config_bg.png").convert()
+                raw_bg = pygame.image.load("assets/images/ui/config_bg.png").convert()
                 self.bg_img = scale_to_cover(raw_bg, self.width, self.height)
             except:
                 self.bg_img = None

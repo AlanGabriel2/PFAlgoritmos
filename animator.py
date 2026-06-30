@@ -23,8 +23,6 @@ class Animator:
         try:
             sheet = pygame.image.load(path).convert_alpha()
             
-
-            
             width, height = sheet.get_size()
             orig_frame_width = width // cols
             orig_frame_height = height // rows

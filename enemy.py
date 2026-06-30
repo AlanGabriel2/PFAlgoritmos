@@ -18,36 +18,38 @@ class EnemyBullet:
         self.x += self.dx
         self.y += self.dy
 
-    def draw(self, surface):
+    def draw(self, surface, offset_x=0, offset_y=0):
+        dx = self.x + offset_x
+        dy = self.y + offset_y
         if self.b_type == "miniboss":
             # Examen reprobado (papel con 'F')
-            pygame.draw.rect(surface, (240, 240, 240), (self.x - 8, self.y - 12, 16, 24))
-            pygame.draw.rect(surface, (0, 0, 0), (self.x - 8, self.y - 12, 16, 24), 1)
+            pygame.draw.rect(surface, (240, 240, 240), (dx - 8, dy - 12, 16, 24))
+            pygame.draw.rect(surface, (0, 0, 0), (dx - 8, dy - 12, 16, 24), 1)
             # Líneas simulando texto
-            pygame.draw.line(surface, (150, 150, 150), (self.x - 5, self.y - 8), (self.x + 5, self.y - 8))
-            pygame.draw.line(surface, (150, 150, 150), (self.x - 5, self.y - 4), (self.x + 5, self.y - 4))
+            pygame.draw.line(surface, (150, 150, 150), (dx - 5, dy - 8), (dx + 5, dy - 8))
+            pygame.draw.line(surface, (150, 150, 150), (dx - 5, dy - 4), (dx + 5, dy - 4))
             # Una 'F' roja gruesa
-            pygame.draw.line(surface, (255, 0, 0), (self.x - 4, self.y + 2), (self.x - 4, self.y + 10), 2)
-            pygame.draw.line(surface, (255, 0, 0), (self.x - 4, self.y + 2), (self.x + 3, self.y + 2), 2)
-            pygame.draw.line(surface, (255, 0, 0), (self.x - 4, self.y + 6), (self.x + 1, self.y + 6), 2)
+            pygame.draw.line(surface, (255, 0, 0), (dx - 4, dy + 2), (dx - 4, dy + 10), 2)
+            pygame.draw.line(surface, (255, 0, 0), (dx - 4, dy + 2), (dx + 3, dy + 2), 2)
+            pygame.draw.line(surface, (255, 0, 0), (dx - 4, dy + 6), (dx + 1, dy + 6), 2)
             
         elif self.b_type == "boss":
             # Tomo de tesis gruesa con sello dorado
-            pygame.draw.rect(surface, (139, 0, 0), (self.x - 12, self.y - 16, 24, 32)) # Tapa roja
-            pygame.draw.rect(surface, (255, 215, 0), (self.x - 12, self.y - 16, 24, 32), 2) # Borde dorado
-            pygame.draw.rect(surface, (220, 220, 220), (self.x + 8, self.y - 14, 4, 28)) # Páginas blancas laterales
+            pygame.draw.rect(surface, (139, 0, 0), (dx - 12, dy - 16, 24, 32)) # Tapa roja
+            pygame.draw.rect(surface, (255, 215, 0), (dx - 12, dy - 16, 24, 32), 2) # Borde dorado
+            pygame.draw.rect(surface, (220, 220, 220), (dx + 8, dy - 14, 4, 28)) # Páginas blancas laterales
             # Texto cruzado o sello dorado en el centro
-            pygame.draw.circle(surface, (255, 215, 0), (int(self.x - 2), int(self.y)), 6)
+            pygame.draw.circle(surface, (255, 215, 0), (int(dx - 2), int(dy)), 6)
             
         else:
-            pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), self.radius)
-            pygame.draw.circle(surface, (255, 255, 255), (int(self.x), int(self.y)), self.radius, 1)
+            pygame.draw.circle(surface, self.color, (int(dx), int(dy)), self.radius)
+            pygame.draw.circle(surface, (255, 255, 255), (int(dx), int(dy)), self.radius, 1)
 
     def is_offscreen(self, w, h):
         return self.x < 0 or self.x > w or self.y < 0 or self.y > h
 
 class Enemy:
-    def __init__(self, x, y, radius, speed, hp, sheet_path, frame_size, cols=4, rows=3):
+    def __init__(self, x, y, radius, speed, hp, sheet_path, frame_width, frame_height=None, cols=4, rows=3):
         self.x = x
         self.y = y
         self.radius = radius
@@ -58,7 +60,9 @@ class Enemy:
         self.state = 1 # 1: Move
         self.bullets = []
         
-        self.animator = Animator(sheet_path, frame_size, frame_size, rows, cols, 0.15)
+        if frame_height is None:
+            frame_height = frame_width
+        self.animator = Animator(sheet_path, frame_width, frame_height, rows, cols, 0.15)
         self.color = (255, 50, 50)
 
     def update(self, player_x, player_y, width, height):
@@ -79,26 +83,24 @@ class Enemy:
         self.y += math.sin(angle) * self.speed
         self.state = 1 # Moving
 
-    def draw(self, surface):
+    def draw(self, surface, offset_x=0, offset_y=0):
         self.animator.set_state(self.state)
         self.animator.update()
         image = self.animator.get_current_image()
         
+        dx = int(self.x + offset_x)
+        dy = int(self.y + offset_y)
+        
         if image:
-            rect = image.get_rect(center=(int(self.x), int(self.y)))
+            rect = image.get_rect(center=(dx, dy))
             surface.blit(image, rect)
         else:
-            pygame.draw.rect(surface, self.color, (int(self.x - self.radius), int(self.y - self.radius), self.radius*2, self.radius*2))
+            pygame.draw.rect(surface, self.color, (dx - self.radius, dy - self.radius, self.radius*2, self.radius*2))
         
-        # Barra de vida
-        hp_ratio = max(0, self.hp / self.max_hp)
-        bar_w = self.radius * 2
-        pygame.draw.rect(surface, (255, 0, 0), (int(self.x - self.radius), int(self.y - self.radius - 10), bar_w, 4))
-        pygame.draw.rect(surface, (0, 255, 0), (int(self.x - self.radius), int(self.y - self.radius - 10), bar_w * hp_ratio, 4))
-
+        # Barra de vida eliminada (ahora se mostrarán números de daño)
         # Dibujar balas enemigas
         for b in self.bullets:
-            b.draw(surface)
+            b.draw(surface, offset_x, offset_y)
 
     def collides_with_bullet(self, bullet):
         dist = math.hypot(self.x - bullet.x, self.y - bullet.y)
@@ -112,11 +114,12 @@ class Enemy:
 
 class BugEnemy(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 24, 3.0, 20, "assets/bug_sheet.png", 64, cols=6)
+        # Tamaño escalado 1.5x
+        super().__init__(x, y, 36, 3.0, 20, "assets/images/enemies/bug_sheet.png", 96, cols=6)
         self.animator.animation_speed = 0.08
 class SpaghettiEnemy(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 26, 1.5, 40, "assets/spaghetti_sheet.png", 64)
+        super().__init__(x, y, 39, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 96)
     def move_logic(self, player_x, player_y):
         # Erratic movement
         angle = math.atan2(player_y - self.y, player_x - self.x) + random.uniform(-0.5, 0.5)
@@ -126,11 +129,11 @@ class SpaghettiEnemy(Enemy):
 
 class MemoryLeakEnemy(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 16, 2.0, 30, "assets/leak_sheet.png", 32)
+        super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet.png", 48)
 
 class DeadlineEnemy(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 24, 1.0, 25, "assets/deadline_sheet.png", 64)
+        super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet.png", 96)
     def move_logic(self, player_x, player_y):
         dist = math.hypot(player_x - self.x, player_y - self.y)
         speed = 4.0 if dist < 150 else 1.0
@@ -139,22 +142,22 @@ class DeadlineEnemy(Enemy):
         self.y += math.sin(angle) * speed
         self.state = 1 if speed == 1.0 else 2
 
-    def draw(self, surface):
+    def draw(self, surface, offset_x=0, offset_y=0):
         # Efecto visual de enfado / aceleración (aura roja pulsante)
         if self.state == 2:
             pulse = (math.sin(pygame.time.get_ticks() / 100.0) + 1) / 2.0
             glow_radius = int(self.radius * (1.2 + 0.5 * pulse))
             glow_surf = pygame.Surface((glow_radius*2, glow_radius*2), pygame.SRCALPHA)
             pygame.draw.circle(glow_surf, (255, 50, 50, int(150 * pulse)), (glow_radius, glow_radius), glow_radius)
-            surface.blit(glow_surf, (int(self.x - glow_radius), int(self.y - glow_radius)))
+            surface.blit(glow_surf, (int(self.x + offset_x - glow_radius), int(self.y + offset_y - glow_radius)))
             
-        super().draw(surface)
+        super().draw(surface, offset_x, offset_y)
 
 # ---- Bosses ----
 
 class MiniBoss(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 60, 1.2, 150, "assets/miniboss_sheet.png", 128)
+        super().__init__(x, y, 90, 1.2, 150, "assets/images/enemies/miniboss_sheet.png", 192)
         self.action_timer = 0
         self.animator.animation_speed = 0.08 # Animación un poco más lenta
         
@@ -179,7 +182,7 @@ class MiniBoss(Enemy):
 
 class Boss(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 70, 0.8, 500, "assets/boss_sheet.png", 192, cols=8, rows=4)
+        super().__init__(x, y, 105, 0.8, 500, "assets/images/enemies/boss_sheet.png", 288, cols=8, rows=4)
         self.action_timer = 0
         
     def move_logic(self, player_x, player_y):

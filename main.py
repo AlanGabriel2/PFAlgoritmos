@@ -26,14 +26,14 @@ init_player_assets()
 
 MAP_BG_IMG = None
 try:
-    MAP_BG_IMG = pygame.image.load("assets/map_bg.png").convert()
+    MAP_BG_IMG = pygame.image.load("assets/images/backgrounds/map_bg.png").convert()
     MAP_BG_IMG = pygame.transform.scale(MAP_BG_IMG, (WIDTH, HEIGHT))
 except Exception as e:
     print("No se pudo cargar el fondo del mapa:", e)
 
 FLOOR_IMG = None
 try:
-    FLOOR_IMG = pygame.image.load("assets/floor_tile.png").convert()
+    FLOOR_IMG = pygame.image.load("assets/images/backgrounds/floor_tile.png").convert()
     # Escalar para llenar la pantalla de combate
     FLOOR_IMG = pygame.transform.scale(FLOOR_IMG, (WIDTH, HEIGHT))
 except Exception as e:
@@ -41,21 +41,43 @@ except Exception as e:
 
 SAVE_ICON_IMG = None
 try:
-    SAVE_ICON_IMG = pygame.image.load("assets/save.png").convert_alpha()
-    if SAVE_ICON_IMG.get_width() > 100:
-        ratio = SAVE_ICON_IMG.get_width() / SAVE_ICON_IMG.get_height()
-        new_w = 40
-        new_h = int(new_w / ratio)
-        SAVE_ICON_IMG = pygame.transform.smoothscale(SAVE_ICON_IMG, (new_w, new_h))
+    SAVE_ICON_IMG = pygame.image.load("assets/images/ui/save.png").convert_alpha()
+    # Forzar un aspecto cuadrado (40x40) para evitar que se vea muy ancha
+    SAVE_ICON_IMG = pygame.transform.scale(SAVE_ICON_IMG, (40, 40))
 except Exception as e:
     print("No se pudo cargar el icono de guardado:", e)
 
+HEART_FRAMES = []
+try:
+    heart_sheet = pygame.image.load("assets/images/ui/vida_heart.png").convert_alpha()
+    # La nueva imagen tiene 5 fotogramas en 1 fila
+    hw = heart_sheet.get_width() // 5
+    hh = heart_sheet.get_height() // 1
+    
+    for c in range(5):
+        rect = pygame.Rect(c * hw, 0, hw, hh)
+        frame = pygame.Surface((hw, hh), pygame.SRCALPHA)
+        frame.blit(heart_sheet, (0, 0), rect)
+        
+        bbox = frame.get_bounding_rect()
+        if bbox.width > 0 and bbox.height > 0:
+            # Crear un cuadrado perfecto (400x400) para centrar y evitar deformación
+            square = pygame.Surface((400, 400), pygame.SRCALPHA)
+            offset_x = (400 - bbox.width) // 2
+            offset_y = (400 - bbox.height) // 2
+            square.blit(frame, (offset_x, offset_y), bbox)
+            
+            cropped = pygame.transform.scale(square, (28, 28)) # Tamaño reducido
+            HEART_FRAMES.append(cropped)
+except Exception as e:
+    print("No se pudo cargar la animacion del corazon:", e)
+
 # Fuentes
 try:
-    font_sm = pygame.font.Font("assets/VT323-Regular.ttf", 20)
-    font_md = pygame.font.Font("assets/VT323-Regular.ttf", 28)
-    font_lg = pygame.font.Font("assets/VT323-Regular.ttf", 56)
-    font_title = pygame.font.Font("assets/VT323-Regular.ttf", 100)
+    font_sm = pygame.font.Font("assets/fonts/VT323-Regular.ttf", 20)
+    font_md = pygame.font.Font("assets/fonts/VT323-Regular.ttf", 28)
+    font_lg = pygame.font.Font("assets/packs/webfontkit-BoldPixels/boldpixels.ttf", 56)
+    font_title = pygame.font.Font("assets/packs/webfontkit-BoldPixels/boldpixels.ttf", 100)
 except:
     font_sm = pygame.font.SysFont("Arial", 16)
     font_md = pygame.font.SysFont("Arial", 24)
@@ -66,9 +88,45 @@ except:
 BG_COLOR = (20, 20, 25)
 TEXT_COLOR = (255, 255, 255)
 
-def draw_floor(surface):
-    if FLOOR_IMG:
-        surface.blit(FLOOR_IMG, (0, 0))
+import os
+
+SEMESTER_BGS = {}
+
+def get_semester_bg(room_id, width, height):
+    if not room_id or len(room_id) < 5:
+        return FLOOR_IMG
+        
+    try:
+        semester_num = int(room_id[3:5])
+    except:
+        return FLOOR_IMG
+        
+    if semester_num in SEMESTER_BGS:
+        return SEMESTER_BGS[semester_num]
+        
+    # Intentar cargar la imagen (probando .png y .jpg)
+    loaded_img = None
+    base_path = f"assets/images/backgrounds/s{semester_num}"
+    
+    if os.path.exists(f"{base_path}.png"):
+        loaded_img = pygame.image.load(f"{base_path}.png").convert()
+    elif os.path.exists(f"{base_path}.jpg"):
+        loaded_img = pygame.image.load(f"{base_path}.jpg").convert()
+        
+    if loaded_img:
+        scaled_img = pygame.transform.scale(loaded_img, (width, height))
+        SEMESTER_BGS[semester_num] = scaled_img
+        return scaled_img
+        
+    return FLOOR_IMG
+
+ARENA_W = int(WIDTH * 1.5)
+ARENA_H = int(HEIGHT * 1.5)
+
+def draw_floor(surface, room_id, offset_x=0, offset_y=0):
+    bg = get_semester_bg(room_id, ARENA_W, ARENA_H)
+    if bg:
+        surface.blit(bg, (offset_x, offset_y))
     else:
         pygame.draw.rect(surface, (40, 30, 30), (0, 0, WIDTH, HEIGHT))
 
@@ -110,14 +168,17 @@ def main():
     last_mouse_pos = (0, 0)
     selected_node = None
     
-    # Variables de Combate
     current_room = None
     combat_player = None
     enemies = []
     
+    combat_cam_x, combat_cam_y = 0, 0
+    
     current_wave = 1
     max_waves = 1
     wave_timer = 0
+    
+    floating_texts = [] # Lista para almacenar los números de daño flotantes
     
     trans_state = {
         "active": False,
@@ -168,11 +229,7 @@ def main():
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                 pygame.display.toggle_fullscreen()
                 
-            if game_state == "DISCLAIMER_SCREEN":
-                action = disclaimer_screen.handle_event(event)
-                if action == "NEXT":
-                    trigger_transition("TITLE_SCREEN", "FADE", 0.05)
-            elif game_state == "TITLE_SCREEN":
+            if game_state == "TITLE_SCREEN":
                 action = title_screen.handle_event(event)
                 if action == "START":
                     main_menu.time = 0
@@ -294,18 +351,18 @@ def main():
                                 current_room = clicked_node
                                 trigger_transition("COMBAT", "CIRCLE", 0.03)
                                 energy -= 1
-                                combat_player = Player(WIDTH//2, HEIGHT//2)
+                                combat_player = Player(ARENA_W//2, ARENA_H//2)
                                 enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
                                 
                                 current_wave = 1
                                 max_waves = 1 + (semester_counter // 2)
                                 wave_timer = 300 # 5 segundos a 60fps
                                 
-                                enemies = [random.choice(enemy_types)(random.randint(100, WIDTH-100), random.randint(100, HEIGHT-100)) for _ in range(random.randint(3, 6))]
+                                enemies = [random.choice(enemy_types)(random.randint(100, ARENA_W-100), random.randint(100, ARENA_H-100)) for _ in range(random.randint(3, 6))]
                                 if current_room == "TIP10TEMTT1":
-                                    enemies.append(Boss(WIDTH//2, 100))
+                                    enemies.append(Boss(ARENA_W//2, 100))
                                 if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
-                                    enemies.append(MiniBoss(random.randint(200, WIDTH-200), random.randint(200, HEIGHT-200)))
+                                    enemies.append(MiniBoss(random.randint(200, ARENA_W-200), random.randint(200, ARENA_H-200)))
                             else:
                                 print("¡No hay suficiente energía! Descansa para avanzar de semestre.")
                                 
@@ -333,18 +390,18 @@ def main():
                                 current_room = selected_node
                                 trigger_transition("COMBAT", "CIRCLE", 0.03)
                                 energy -= 1
-                                combat_player = Player(WIDTH//2, HEIGHT//2)
+                                combat_player = Player(ARENA_W//2, ARENA_H//2)
                                 enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
                                 
                                 current_wave = 1
                                 max_waves = 1 + (semester_counter // 2)
                                 wave_timer = 300
                                 
-                                enemies = [random.choice(enemy_types)(random.randint(100, WIDTH-100), random.randint(100, HEIGHT-100)) for _ in range(random.randint(3, 6))]
+                                enemies = [random.choice(enemy_types)(random.randint(100, ARENA_W-100), random.randint(100, ARENA_H-100)) for _ in range(random.randint(3, 6))]
                                 if current_room == "TIP10TEMTT1":
-                                    enemies.append(Boss(WIDTH//2, 100))
+                                    enemies.append(Boss(ARENA_W//2, 100))
                                 if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
-                                    enemies.append(MiniBoss(random.randint(200, WIDTH-200), random.randint(200, HEIGHT-200)))
+                                    enemies.append(MiniBoss(random.randint(200, ARENA_W-200), random.randint(200, ARENA_H-200)))
                             else:
                                 print("¡No hay suficiente energía! Descansa para avanzar de semestre.")
                                 
@@ -380,14 +437,17 @@ def main():
                     trigger_transition("PAUSE", "FADE", 0.08)
                 # Disparar con el ratón
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    combat_player.shoot(mouse_x, mouse_y)
+                    combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
             elif game_state in ["WIN", "GAME_OVER"]:
                 if event.type == pygame.KEYDOWN and (event.key == pygame.K_r or event.key == pygame.K_SPACE):
                     main()
                     return
 
         # Actualizaciones Continuas (teclas presionadas)
-        if game_state == "TUTORIAL":
+        if game_state == "DISCLAIMER_SCREEN":
+            if disclaimer_screen.time > 200 and not trans_state["active"]:
+                trigger_transition("TITLE_SCREEN", "FADE", 0.03)
+        elif game_state == "TUTORIAL":
             tutorial_state.update(keys, WIDTH, HEIGHT)
         elif game_state == "COMBAT":
             # Disparar con flechas (soporta diagonales)
@@ -402,13 +462,24 @@ def main():
                 
             # Mouse drag shooting
             if pygame.mouse.get_pressed()[0]:
-                combat_player.shoot(mouse_x, mouse_y)
+                combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
                 
-            combat_player.move(keys, WIDTH, HEIGHT)
-            combat_player.update_bullets(WIDTH, HEIGHT)
+            combat_player.move(keys, ARENA_W, ARENA_H)
+            combat_player.update_bullets(ARENA_W, ARENA_H)
+            
+            # Camera logic (smooth follow)
+            target_cam_x = WIDTH // 2 - combat_player.x
+            target_cam_y = HEIGHT // 2 - combat_player.y
+            
+            # Clamping camera to boundaries
+            target_cam_x = min(0, max(-(ARENA_W - WIDTH), target_cam_x))
+            target_cam_y = min(0, max(-(ARENA_H - HEIGHT), target_cam_y))
+            
+            combat_cam_x += (target_cam_x - combat_cam_x) * 0.1
+            combat_cam_y += (target_cam_y - combat_cam_y) * 0.1
             
             for enemy in enemies:
-                enemy.update(combat_player.x, combat_player.y, WIDTH, HEIGHT)
+                enemy.update(combat_player.x, combat_player.y, ARENA_W, ARENA_H)
                 
                 if isinstance(enemy, MiniBoss):
                     bestiary_menu.unlock("MINI BOSS (PARCIAL)")
@@ -438,11 +509,29 @@ def main():
             for b in combat_player.bullets[:]:
                 for e in enemies[:]:
                     if e.collides_with_bullet(b):
-                        e.hp -= 10
+                        damage = 10
+                        e.hp -= damage
+                        
+                        # Generar texto flotante de daño
+                        floating_texts.append({
+                            "text": str(damage),
+                            "x": e.x,
+                            "y": e.y - 20,
+                            "life": 40,
+                            "color": (255, 50, 50)
+                        })
+                        
                         if b in combat_player.bullets:
                             combat_player.bullets.remove(b)
                         if e.hp <= 0:
                             enemies.remove(e)
+            
+            # Actualizar textos flotantes
+            for ft in floating_texts[:]:
+                ft["y"] -= 1.5  # Subir
+                ft["life"] -= 1 # Desvanecerse
+                if ft["life"] <= 0:
+                    floating_texts.remove(ft)
             
             # Spawnear nuevas rondas
             if current_wave < max_waves:
@@ -451,8 +540,8 @@ def main():
                     current_wave += 1
                     wave_timer = 300 # Reset timer para la siguiente ola
                     
-                    # Spawn desde la puerta (WIDTH*0.85, HEIGHT*0.22) -> (870, 168) aproximado
-                    door_x, door_y = int(WIDTH * 0.85), int(HEIGHT * 0.22)
+                    # Spawn desde la puerta (ARENA_W*0.85, ARENA_H*0.22)
+                    door_x, door_y = int(ARENA_W * 0.85), int(ARENA_H * 0.22)
                     enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
                     
                     for _ in range(random.randint(3, 5)):
@@ -587,10 +676,18 @@ def main():
                 screen.blit(msg2, msg2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50 - offset_y)))
                 
         elif game_state == "COMBAT" or (game_state == "PAUSE" and previous_state == "COMBAT"):
-            draw_floor(screen)
-            combat_player.draw(screen)
+            draw_floor(screen, current_room, combat_cam_x, combat_cam_y)
+            combat_player.draw(screen, combat_cam_x, combat_cam_y)
             for e in enemies:
-                e.draw(screen)
+                e.draw(screen, combat_cam_x, combat_cam_y)
+                
+            # Dibujar textos flotantes de daño
+            for ft in floating_texts:
+                alpha = min(255, int((ft["life"] / 40.0) * 255))
+                dmg_surf = font_md.render(ft["text"], True, ft["color"])
+                dmg_surf.set_alpha(alpha)
+                rect = dmg_surf.get_rect(center=(int(ft["x"] + combat_cam_x), int(ft["y"] + combat_cam_y)))
+                screen.blit(dmg_surf, rect)
                 
             # UI de Combate - Panel superior
             hud_rect = pygame.Surface((WIDTH, 60))
@@ -600,22 +697,47 @@ def main():
             pygame.draw.line(screen, (150, 150, 150), (0, 60), (WIDTH, 60), 2)
             
             # Dibujar barra de vida gráfica del jugador (Top-Left)
-            hp_text = font_md.render("Vida:", False, (255, 255, 255))
-            screen.blit(hp_text, (15, 15))
-            
-            bar_x = 15 + hp_text.get_width() + 10
-            bar_y = 18
-            bar_w = 200
-            bar_h = 24
-            
-            hp_ratio = max(0, combat_player.hp / combat_player.max_hp)
-            pygame.draw.rect(screen, (80, 20, 20), (bar_x, bar_y, bar_w, bar_h)) # Fondo de la barra
-            pygame.draw.rect(screen, (255, 50, 50), (bar_x, bar_y, bar_w * hp_ratio, bar_h)) # Relleno de vida
-            pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 2) # Borde de la barra
-            
-            # Texto de vida (numérico) centrado en la barra
-            hp_num = font_sm.render(f"{max(0, combat_player.hp)}/{combat_player.max_hp}", False, (255, 255, 255))
-            screen.blit(hp_num, (bar_x + bar_w//2 - hp_num.get_width()//2, bar_y + 2))
+            if HEART_FRAMES and len(HEART_FRAMES) == 5:
+                max_hearts = 7
+                hp_per_heart = combat_player.max_hp / max_hearts
+                
+                # Suavizar la animación de pérdida de vida
+                if not hasattr(combat_player, 'display_hp'):
+                    combat_player.display_hp = combat_player.hp
+                if combat_player.display_hp > combat_player.hp:
+                    combat_player.display_hp -= 2.0  # Animación rápida
+                elif combat_player.display_hp < combat_player.hp:
+                    combat_player.display_hp = combat_player.hp
+                
+                current_hp = combat_player.display_hp
+                
+                bar_x = 15
+                bar_y = 15
+                for i in range(max_hearts):
+                    heart_hp = current_hp - (i * hp_per_heart)
+                    heart_hp = max(0, min(hp_per_heart, heart_hp))
+                    fraction = heart_hp / hp_per_heart
+                    frame_idx = int(round(fraction * 4)) # 0 a 4 (5 fotogramas)
+                    frame_idx = max(0, min(4, frame_idx))
+                    
+                    screen.blit(HEART_FRAMES[frame_idx], (bar_x + i * 32, bar_y)) # Separación ajustada (32px)
+            else:
+                hp_text = font_md.render("Vida:", False, (255, 255, 255))
+                screen.blit(hp_text, (15, 15))
+                
+                bar_x = 15 + hp_text.get_width() + 10
+                bar_y = 18
+                bar_w = 200
+                bar_h = 24
+                
+                hp_ratio = max(0, combat_player.hp / combat_player.max_hp)
+                pygame.draw.rect(screen, (80, 20, 20), (bar_x, bar_y, bar_w, bar_h)) # Fondo de la barra
+                pygame.draw.rect(screen, (255, 50, 50), (bar_x, bar_y, bar_w * hp_ratio, bar_h)) # Relleno de vida
+                pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 2) # Borde de la barra
+                
+                # Texto de vida numérico
+                hp_num = font_sm.render(f"{max(0, int(combat_player.hp))}/{combat_player.max_hp}", False, (255, 255, 255))
+                screen.blit(hp_num, (bar_x + bar_w//2 - hp_num.get_width()//2, bar_y + 2))
 
             # Título de la sala (Top-Right)
             room_name = engine.subjects[current_room]['name']
