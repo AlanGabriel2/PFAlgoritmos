@@ -9,6 +9,7 @@ from dag_engine import DagEngine, NodeState
 from map_generator import MapGenerator
 from player import Player, init_player_assets
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
+from level import load_combat_level
 from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu
 from tutorial import TutorialState
 
@@ -88,6 +89,7 @@ except:
 BG_COLOR = (20, 20, 25)
 TEXT_COLOR = (255, 255, 255)
 
+
 import os
 
 SEMESTER_BGS = {}
@@ -118,12 +120,11 @@ def get_semester_bg(room_id, width, height):
         SEMESTER_BGS[semester_num] = scaled_img
         return scaled_img
         
-    return FLOOR_IMG
-
 ARENA_W = int(WIDTH * 1.5)
 ARENA_H = int(HEIGHT * 1.5)
 
 def draw_floor(surface, room_id, offset_x=0, offset_y=0):
+
     bg = get_semester_bg(room_id, ARENA_W, ARENA_H)
     if bg:
         surface.blit(bg, (offset_x, offset_y))
@@ -171,6 +172,10 @@ def main():
     current_room = None
     combat_player = None
     enemies = []
+    current_level = load_combat_level(fallback_size=(ARENA_W, ARENA_H))
+    collision_manager = current_level.create_collision_manager()
+    combat_bg_img = FLOOR_IMG
+    debug_collisions = False
     
     combat_cam_x, combat_cam_y = 0, 0
     
@@ -197,7 +202,68 @@ def main():
         trans_state["old_surf"] = screen.copy()
         game_state = target
 
-    
+    def load_level_background(level):
+        if not level.background:
+            return FLOOR_IMG
+        try:
+            image = pygame.image.load(level.background).convert()
+            return pygame.transform.scale(image, tuple(level.size))
+        except Exception as e:
+            print(f"No se pudo cargar el fondo del nivel {level.name}: {e}")
+            return FLOOR_IMG
+
+    def load_room_level(room_id):
+        nonlocal current_level, collision_manager, combat_bg_img
+        current_level = load_combat_level(room_id, fallback_size=(ARENA_W, ARENA_H))
+        collision_manager = current_level.create_collision_manager()
+        combat_bg_img = load_level_background(current_level)
+
+    def spawn_enemy(enemy_cls, preferred_positions=None):
+        positions = list(preferred_positions or [])
+        if current_level.enemy_spawns:
+            level_spawns = list(current_level.enemy_spawns)
+            random.shuffle(level_spawns)
+            positions.extend(level_spawns)
+
+        last_position = positions[0] if positions else (WIDTH // 2, HEIGHT // 2)
+        for attempt in range(80):
+            if attempt < len(positions):
+                x, y = positions[attempt]
+            else:
+                x = random.randint(80, WIDTH - 80)
+                y = random.randint(80, HEIGHT - 80)
+            last_position = (x, y)
+
+            enemy = enemy_cls(x, y)
+            enemy.sync_rect_to_position()
+            if collision_manager and collision_manager.check_collision(enemy.rect):
+                continue
+            if combat_player and enemy.rect.colliderect(combat_player.rect.inflate(140, 140)):
+                continue
+            return enemy
+
+        return enemy_cls(last_position[0], last_position[1])
+
+    def start_combat(room_id):
+        nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy
+        current_room = room_id
+        load_room_level(current_room)
+        trigger_transition("COMBAT", "CIRCLE", 0.03)
+        energy -= 1
+
+        combat_player = Player(*current_level.player_spawn)
+        current_wave = 1
+        max_waves = 1 + (semester_counter // 2)
+        wave_timer = 300
+
+        enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
+        enemies = [spawn_enemy(random.choice(enemy_types)) for _ in range(random.randint(3, 6))]
+        if current_room == "TIP10TEMTT1":
+            enemies.append(spawn_enemy(Boss, [(ARENA_W // 2, 100)]))
+        if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
+            enemies.append(spawn_enemy(MiniBoss, [(ARENA_W // 2, ARENA_H // 3)]))
+
+    load_room_level(None)
     running = True
     while running:
         # Escalar coordenadas del ratón
@@ -228,6 +294,8 @@ def main():
                 
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                 pygame.display.toggle_fullscreen()
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
+                debug_collisions = not debug_collisions
                 
             if game_state == "TITLE_SCREEN":
                 action = title_screen.handle_event(event)
@@ -348,21 +416,7 @@ def main():
                         if clicked_node and engine.state[clicked_node] == NodeState.UNLOCKED:
                             selected_node = clicked_node # La seleccionamos y entramos
                             if energy > 0:
-                                current_room = clicked_node
-                                trigger_transition("COMBAT", "CIRCLE", 0.03)
-                                energy -= 1
-                                combat_player = Player(ARENA_W//2, ARENA_H//2)
-                                enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
-                                
-                                current_wave = 1
-                                max_waves = 1 + (semester_counter // 2)
-                                wave_timer = 300 # 5 segundos a 60fps
-                                
-                                enemies = [random.choice(enemy_types)(random.randint(100, ARENA_W-100), random.randint(100, ARENA_H-100)) for _ in range(random.randint(3, 6))]
-                                if current_room == "TIP10TEMTT1":
-                                    enemies.append(Boss(ARENA_W//2, 100))
-                                if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
-                                    enemies.append(MiniBoss(random.randint(200, ARENA_W-200), random.randint(200, ARENA_H-200)))
+                                start_combat(clicked_node)
                             else:
                                 print("¡No hay suficiente energía! Descansa para avanzar de semestre.")
                                 
@@ -387,21 +441,7 @@ def main():
                     elif event.key == pygame.K_RETURN: # Entrar con Enter
                         if selected_node and engine.state[selected_node] == NodeState.UNLOCKED:
                             if energy > 0:
-                                current_room = selected_node
-                                trigger_transition("COMBAT", "CIRCLE", 0.03)
-                                energy -= 1
-                                combat_player = Player(ARENA_W//2, ARENA_H//2)
-                                enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
-                                
-                                current_wave = 1
-                                max_waves = 1 + (semester_counter // 2)
-                                wave_timer = 300
-                                
-                                enemies = [random.choice(enemy_types)(random.randint(100, ARENA_W-100), random.randint(100, ARENA_H-100)) for _ in range(random.randint(3, 6))]
-                                if current_room == "TIP10TEMTT1":
-                                    enemies.append(Boss(ARENA_W//2, 100))
-                                if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
-                                    enemies.append(MiniBoss(random.randint(200, ARENA_W-200), random.randint(200, ARENA_H-200)))
+                                start_combat(selected_node)
                             else:
                                 print("¡No hay suficiente energía! Descansa para avanzar de semestre.")
                                 
@@ -464,7 +504,7 @@ def main():
             if pygame.mouse.get_pressed()[0]:
                 combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
                 
-            combat_player.move(keys, ARENA_W, ARENA_H)
+            combat_player.move(keys, ARENA_W, ARENA_H, collision_manager)
             combat_player.update_bullets(ARENA_W, ARENA_H)
             
             # Camera logic (smooth follow)
@@ -479,7 +519,7 @@ def main():
             combat_cam_y += (target_cam_y - combat_cam_y) * 0.1
             
             for enemy in enemies:
-                enemy.update(combat_player.x, combat_player.y, ARENA_W, ARENA_H)
+                enemy.update(combat_player.x, combat_player.y, ARENA_W, ARENA_H, collision_manager)
                 
                 if isinstance(enemy, MiniBoss):
                     bestiary_menu.unlock("MINI BOSS (PARCIAL)")
@@ -547,10 +587,10 @@ def main():
                     for _ in range(random.randint(3, 5)):
                         ex = door_x + random.randint(-20, 20)
                         ey = door_y + random.randint(-20, 20)
-                        enemies.append(random.choice(enemy_types)(ex, ey))
+                        enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
                         
                     if current_wave == max_waves and current_room in engine.critical_nodes and current_room != "TIP10TEMTT1":
-                        enemies.append(MiniBoss(door_x, door_y))
+                        enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
 
             # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
             if current_wave == max_waves and not enemies:
@@ -688,6 +728,16 @@ def main():
                 dmg_surf.set_alpha(alpha)
                 rect = dmg_surf.get_rect(center=(int(ft["x"] + combat_cam_x), int(ft["y"] + combat_cam_y)))
                 screen.blit(dmg_surf, rect)
+
+            if debug_collisions and collision_manager:
+                collision_manager.draw_debug(screen, camera=(combat_cam_x, combat_cam_y))
+                
+                # We need to offset the rect for debug drawing
+                p_rect = combat_player.rect.move(combat_cam_x, combat_cam_y)
+                pygame.draw.rect(screen, (0, 255, 255), p_rect, 1)
+                for e in enemies:
+                    e_rect = e.rect.move(combat_cam_x, combat_cam_y)
+                    pygame.draw.rect(screen, (255, 80, 180), e_rect, 1)
                 
             # UI de Combate - Panel superior
             hud_rect = pygame.Surface((WIDTH, 60))

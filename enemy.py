@@ -53,6 +53,8 @@ class Enemy:
         self.x = x
         self.y = y
         self.radius = radius
+        self.rect = pygame.Rect(0, 0, radius * 2, radius * 2)
+        self.sync_rect_to_position()
         self.speed = speed
         self.hp = hp
         self.max_hp = hp
@@ -65,8 +67,25 @@ class Enemy:
         self.animator = Animator(sheet_path, frame_width, frame_height, rows, cols, 0.15)
         self.color = (255, 50, 50)
 
-    def update(self, player_x, player_y, width, height):
+    def sync_rect_to_position(self):
+        self.rect.center = (int(round(self.x)), int(round(self.y)))
+
+    def sync_position_to_rect(self):
+        self.x = float(self.rect.centerx)
+        self.y = float(self.rect.centery)
+
+    def update(self, player_x, player_y, width, height, collision_manager=None):
+        old_x, old_y = self.x, self.y
         self.move_logic(player_x, player_y)
+        dx = self.x - old_x
+        dy = self.y - old_y
+
+        if collision_manager:
+            self.x, self.y = old_x, old_y
+            self.sync_rect_to_position()
+            collision_manager.move_and_collide(self, dx, dy)
+        else:
+            self.sync_rect_to_position()
         
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1

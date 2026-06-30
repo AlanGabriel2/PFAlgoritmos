@@ -29,6 +29,8 @@ class Player:
         self.x = x
         self.y = y
         self.radius = 30 # Escalado 1.5x
+        self.rect = pygame.Rect(0, 0, 51, 57)
+        self.sync_rect_to_position()
         self.speed = 5
         self.hp = 100
         self.max_hp = 100
@@ -44,33 +46,54 @@ class Player:
         self.state = 0 # 0: Idle, 1: Walk, 2: Attack
         self.flip = False
 
-    def move(self, keys, width, height):
+    def sync_rect_to_position(self):
+        self.rect.center = (int(round(self.x)), int(round(self.y)))
+
+    def sync_position_to_rect(self):
+        self.x = float(self.rect.centerx)
+        self.y = float(self.rect.centery)
+
+    def move(self, keys, width, height, collision_manager=None):
         moved = False
+        dx = 0
+        dy = 0
+
         if keys[pygame.K_w]:
-            self.y -= self.speed
+            dy -= 1
             moved = True
         if keys[pygame.K_s]:
-            self.y += self.speed
+            dy += 1
             moved = True
         if keys[pygame.K_a]:
-            self.x -= self.speed
+            dx -= 1
             moved = True
             self.flip = True # Mirar a la izquierda
         if keys[pygame.K_d]:
-            self.x += self.speed
+            dx += 1
             moved = True
             self.flip = False # Mirar a la derecha
+
+        if dx != 0 and dy != 0:
+            diagonal_factor = 1 / math.sqrt(2)
+            dx *= diagonal_factor
+            dy *= diagonal_factor
+
+        dx *= self.speed
+        dy *= self.speed
+
+        if collision_manager:
+            collision_manager.move_and_collide(self, dx, dy)
+        else:
+            self.x += dx
+            self.y += dy
+            self.sync_rect_to_position()
+            self.rect.clamp_ip(pygame.Rect(0, 0, width, height))
+            self.sync_position_to_rect()
 
         if moved and self.shoot_cooldown == 0:
             self.state = 1 # Walk
         elif self.shoot_cooldown == 0:
             self.state = 0 # Idle
-
-        # Restringir a los límites de la habitación
-        if self.x < self.radius: self.x = self.radius
-        if self.y < self.radius: self.y = self.radius
-        if self.x > width - self.radius: self.x = width - self.radius
-        if self.y > height - self.radius: self.y = height - self.radius
 
     def shoot(self, target_x, target_y):
         if self.shoot_cooldown == 0:

@@ -2,6 +2,7 @@ import pygame
 import math
 from player import Player
 from enemy import BugEnemy
+from level import load_combat_level
 
 class TutorialPhase:
     TEXT_MAP = 0
@@ -23,6 +24,7 @@ class TutorialState:
         # Combat practice entities
         self.player = None
         self.dummy_target = None
+        self.collision_manager = load_combat_level(fallback_size=(width, height)).create_collision_manager()
         
         # UI messages
         self.map_msg = [
@@ -55,6 +57,7 @@ class TutorialState:
         self.timer = 0
         self.player = None
         self.dummy_target = None
+        self.collision_manager = load_combat_level(fallback_size=(self.width, self.height)).create_collision_manager()
 
     def handle_event(self, event, mouse_x, mouse_y):
         if self.phase == TutorialPhase.TEXT_MAP:
@@ -80,7 +83,7 @@ class TutorialState:
     def update(self, keys, width, height):
         if self.phase == TutorialPhase.COMBAT_PRACTICE:
             # Player movement
-            self.player.move(keys, width, height)
+            self.player.move(keys, width, height, self.collision_manager)
             self.player.update_bullets(width, height)
             
             # Allow arrow key shooting in tutorial

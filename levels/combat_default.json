@@ -1,0 +1,24 @@
+{
+  "name": "combat_default",
+  "background": "assets/floor_tile.png",
+  "size": [1024, 768],
+  "coordinate_system": "internal game surface coordinates, 1024x768",
+  "player_spawn": [512, 384],
+  "enemy_spawns": [
+    [512, 120],
+    [512, 648],
+    [120, 384],
+    [904, 384],
+    [220, 180],
+    [804, 588]
+  ],
+  "colliders": [
+    { "name": "top_boundary", "type": "boundary", "x": 0, "y": -32, "w": 1024, "h": 32 },
+    { "name": "bottom_boundary", "type": "boundary", "x": 0, "y": 768, "w": 1024, "h": 32 },
+    { "name": "left_boundary", "type": "boundary", "x": -32, "y": 0, "w": 32, "h": 768 },
+    { "name": "right_boundary", "type": "boundary", "x": 1024, "y": 0, "w": 32, "h": 768 }
+  ],
+  "triggers": [],
+  "interactables": [],
+  "doors": []
+}
