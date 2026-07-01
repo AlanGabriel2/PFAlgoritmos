@@ -97,7 +97,7 @@ class DisclaimerScreen:
             arc_angle = (self.time * 5) % 360
             pygame.draw.arc(surface, (255, 255, 255), (cx-30, cy-30, 60, 60), math.radians(arc_angle), math.radians(arc_angle+90), 6)
 
-        title = self.font_lg.render("AUTOGUARDADO ACTIVADO", True, (255, 255, 255))
+        title = self.font_md.render("AUTOGUARDADO ACTIVADO", True, (255, 255, 255))
         title_rect = title.get_rect(center=(self.width // 2, self.height // 2 - 20))
         surface.blit(title, title_rect)
 
@@ -124,8 +124,10 @@ class TitleScreen:
         except:
             self.bg_img = None
         
-    def handle_event(self, event):
+    def handle_event(self, event, mouse_x=0, mouse_y=0):
         if event.type == pygame.KEYDOWN:
+            return "START"
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             return "START"
         return None
         
@@ -173,6 +175,7 @@ class MainMenu:
         self.time = 0
         self.notification = ""
         self.notification_timer = 0
+        self.option_rects = []
         try:
             self.title_img = pygame.image.load("assets/images/ui/titulo_juego.png").convert_alpha()
             # Escalar si es necesario
@@ -206,9 +209,45 @@ class MainMenu:
         if "Bestiario" not in self.options:
             self.options.insert(2, "Bestiario")
 
-    def handle_event(self, event):
+    def update_option_rects(self):
+        self.option_rects = []
+        opts = self.current_options
+        for i, option in enumerate(opts):
+            is_submenu = option.startswith("  ")
+            display_text = option.strip()
+            if i == self.selected_index:
+                if is_submenu:
+                    text = self.font_md.render("- " + display_text + " -", True, (220, 220, 220))
+                else:
+                    text = self.font_md.render("> " + display_text + " <", True, (255, 255, 255))
+            else:
+                text = self.font_md.render(display_text, True, (255, 255, 255))
+            rect = text.get_rect(center=(self.width // 2, self.height // 2 + i * 45))
+            self.option_rects.append((rect, i))
+
+    def handle_event(self, event, mouse_x=0, mouse_y=0):
+        self.update_option_rects()
+        opts = self.current_options
+        
+        if event.type == pygame.MOUSEMOTION:
+            for rect, i in self.option_rects:
+                if rect.collidepoint(mouse_x, mouse_y):
+                    self.selected_index = i
+            return None
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for rect, i in self.option_rects:
+                if rect.collidepoint(mouse_x, mouse_y):
+                    self.selected_index = i
+                    selection = opts[self.selected_index]
+                    if selection == "Jugar":
+                        self.jugar_expanded = not self.jugar_expanded
+                        if not self.jugar_expanded and self.selected_index >= len(self.current_options):
+                            self.selected_index = self.current_options.index("Jugar")
+                    return selection.strip()
+            return None
+
         if event.type == pygame.KEYDOWN:
-            opts = self.current_options
             if event.key == pygame.K_UP:
                 self.selected_index = (self.selected_index - 1) % len(opts)
             elif event.key == pygame.K_DOWN:
@@ -352,8 +391,85 @@ class SlotSelectMenu:
         self.selected_index = 0
         self.confirming_slot = None
         self.confirm_index = 0
+        self.option_rects = []
+        self.confirm_rects = []
 
-    def handle_event(self, event):
+    def update_option_rects(self):
+        self.option_rects = []
+        for i in range(3):
+            slot_name = f"Slot {i+1}"
+            has_save = self.save_manager.has_save(i+1)
+            
+            if self.mode == "CARGAR" and not has_save:
+                opt_str = f"{slot_name}: VACIO"
+                text = self.font_md.render(opt_str, True, (100, 100, 100))
+            else:
+                opt_str = f"{slot_name}: {'EXISTE' if has_save else 'VACIO'}"
+                if i == self.selected_index:
+                    text = self.font_md.render("> " + opt_str + " <", True, (255, 255, 255))
+                else:
+                    text = self.font_md.render(opt_str, True, (150, 150, 150))
+                    
+            rect = text.get_rect(center=(self.width // 2, self.height // 2 - 30 + i * 50))
+            self.option_rects.append((rect, i))
+            
+        # Rect for "Regresar"
+        back_color = (255, 255, 255) if self.selected_index == 3 else (150, 150, 150)
+        back_text = self.font_md.render("> Regresar <" if self.selected_index == 3 else "Regresar", True, back_color)
+        back_rect = back_text.get_rect(center=(self.width // 2, self.height // 2 + 3 * 60 + 20))
+        self.option_rects.append((back_rect, 3))
+        
+        self.confirm_rects = []
+        if self.confirming_slot:
+            opts = ["NO", "SI"]
+            for idx, opt in enumerate(opts):
+                text = self.font_md.render(f"> {opt} <" if idx == self.confirm_index else opt, True, (255, 255, 255))
+                rect = text.get_rect(center=(self.width // 2 - 60 + idx * 120, self.height // 2 + 80))
+                self.confirm_rects.append((rect, idx))
+
+    def handle_event(self, event, mouse_x=0, mouse_y=0):
+        self.update_option_rects()
+        
+        if event.type == pygame.MOUSEMOTION:
+            if self.confirming_slot:
+                for rect, i in self.confirm_rects:
+                    if rect.collidepoint(mouse_x, mouse_y):
+                        self.confirm_index = i
+            else:
+                for rect, i in self.option_rects:
+                    if rect.collidepoint(mouse_x, mouse_y):
+                        # Block hover on disabled slots
+                        if i < 3 and self.mode == "CARGAR" and not self.save_manager.has_save(i+1):
+                            continue
+                        self.selected_index = i
+            return None
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.confirming_slot:
+                for rect, i in self.confirm_rects:
+                    if rect.collidepoint(mouse_x, mouse_y):
+                        self.confirm_index = i
+                        if self.confirm_index == 1:
+                            return self.confirming_slot
+                        else:
+                            self.confirming_slot = None
+                            return None
+            else:
+                for rect, i in self.option_rects:
+                    if rect.collidepoint(mouse_x, mouse_y):
+                        if i < 3 and self.mode == "CARGAR" and not self.save_manager.has_save(i+1):
+                            continue
+                        self.selected_index = i
+                        selection = self.options[self.selected_index]
+                        if selection.startswith("Slot ") and self.mode == "NUEVA":
+                            slot_num = int(selection.split(" ")[1])
+                            if self.save_manager.has_save(slot_num):
+                                self.confirming_slot = selection
+                                self.confirm_index = 0
+                                return None
+                        return selection
+            return None
+
         if event.type == pygame.KEYDOWN:
             if self.confirming_slot:
                 if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
@@ -377,7 +493,11 @@ class SlotSelectMenu:
                     slot_num = int(selection.split(" ")[1])
                     if self.save_manager.has_save(slot_num):
                         self.confirming_slot = selection
-                        self.confirm_index = 0 # Default to No
+                        self.confirm_index = 0
+                        return None
+                if selection.startswith("Slot ") and self.mode == "CARGAR":
+                    slot_num = int(selection.split(" ")[1])
+                    if not self.save_manager.has_save(slot_num):
                         return None
                 return selection
             elif event.key == pygame.K_ESCAPE:
@@ -442,10 +562,36 @@ class PauseMenu:
         self.height = height
         self.font_lg = font_lg
         self.font_md = font_md
-        self.options = ["Continuar", "Guardar y Salir al menú principal"]
+        self.options = ["Continuar", "Opciones", "Guardar y Salir al menú principal"]
         self.selected_index = 0
+        self.option_rects = []
 
-    def handle_event(self, event):
+    def update_option_rects(self):
+        self.option_rects = []
+        for i, option in enumerate(self.options):
+            if i == self.selected_index:
+                text = self.font_md.render("> " + option + " <", True, (255, 255, 255))
+            else:
+                text = self.font_md.render(option, True, (255, 255, 255))
+            rect = text.get_rect(center=(self.width // 2, self.height // 2 + i * 60))
+            self.option_rects.append((rect, i))
+
+    def handle_event(self, event, mouse_x=0, mouse_y=0):
+        self.update_option_rects()
+        
+        if event.type == pygame.MOUSEMOTION:
+            for rect, i in self.option_rects:
+                if rect.collidepoint(mouse_x, mouse_y):
+                    self.selected_index = i
+            return None
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for rect, i in self.option_rects:
+                if rect.collidepoint(mouse_x, mouse_y):
+                    self.selected_index = i
+                    return self.options[self.selected_index]
+            return None
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 self.selected_index = (self.selected_index - 1) % len(self.options)
@@ -533,7 +679,7 @@ class BestiaryMenu:
         if name not in self.unlocked_names:
             self.unlocked_names.append(name)
 
-    def handle_event(self, event):
+    def handle_event(self, event, mouse_x=0, mouse_y=0):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 self.current_index = (self.current_index - 1) % len(self.enemies_data)
@@ -542,10 +688,20 @@ class BestiaryMenu:
             elif event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                 return "BACK"
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if hasattr(self, 'left_rect') and self.left_rect and self.left_rect.collidepoint(event.pos):
+            if hasattr(self, 'left_rect') and self.left_rect and self.left_rect.collidepoint(mouse_x, mouse_y):
                 self.current_index = (self.current_index - 1) % len(self.enemies_data)
-            elif hasattr(self, 'right_rect') and self.right_rect and self.right_rect.collidepoint(event.pos):
+            elif hasattr(self, 'right_rect') and self.right_rect and self.right_rect.collidepoint(mouse_x, mouse_y):
                 self.current_index = (self.current_index + 1) % len(self.enemies_data)
+        elif event.type == pygame.MOUSEWHEEL:
+            # y > 0 means scroll up, y < 0 means scroll down
+            if event.y > 0:
+                # Scroll up (left)
+                if self.current_index > 0:
+                    self.current_index -= 1
+            elif event.y < 0:
+                # Scroll down (right)
+                if self.current_index < len(self.enemies_data) - 1:
+                    self.current_index += 1
         return None
 
     def draw(self, surface):
@@ -670,6 +826,8 @@ class OptionsMenu:
         self.general_volume = global_data.get("volume", 100) if global_data else 100
         self.music_volume = global_data.get("music_volume", 100) if global_data else 100
         self.time = 0
+        self.option_rects = []
+        self.arrow_rects = []
         
         try:
             self.bg_img = pygame.image.load("assets/images/ui/config_bg.png").convert()
@@ -688,7 +846,75 @@ class OptionsMenu:
             except:
                 self.bg_img = None
 
-    def handle_event(self, event):
+    def update_option_rects(self):
+        self.option_rects = []
+        self.arrow_rects = []
+        start_y = self.height // 3
+        spacing = 50
+        
+        for i, option in enumerate(self.options):
+            value_str = ""
+            if option == "Modo de Pantalla":
+                value_str = "Completa" if self.fullscreen else "Ventana"
+            elif option == "Resolución":
+                r = self.available_resolutions[self.res_index]
+                value_str = f"{r[0]}x{r[1]}"
+            elif option == "Volumen General":
+                value_str = f"{self.general_volume}%"
+            elif option == "Volumen Música":
+                value_str = f"{self.music_volume}%"
+                
+            display_text = f"  {option}: {value_str}  " if value_str else f"  {option}  "
+            if i == self.selected_index:
+                display_text = f"> {option}: {value_str} <" if value_str else f"> {option} <"
+                
+            text_surf = self.font_md.render(display_text, True, (255, 255, 255))
+            rect = text_surf.get_rect(center=(self.width // 2, start_y + i * spacing))
+            
+            # The central option rect (for hover and selecting)
+            self.option_rects.append((rect, i))
+            
+            # If the option has a value (i < 4), create large arrow hitboxes on left and right
+            if i < 4 and i == self.selected_index:
+                # Left arrow hitbox (wide)
+                left_rect = pygame.Rect(rect.left - 40, rect.top - 10, 80, rect.height + 20)
+                # Right arrow hitbox (wide)
+                right_rect = pygame.Rect(rect.right - 40, rect.top - 10, 80, rect.height + 20)
+                
+                self.arrow_rects.append((left_rect, i, -1))
+                self.arrow_rects.append((right_rect, i, 1))
+
+    def handle_event(self, event, mouse_x=0, mouse_y=0):
+        self.update_option_rects()
+        
+        if event.type == pygame.MOUSEMOTION:
+            for rect, i in self.option_rects:
+                if rect.collidepoint(mouse_x, mouse_y):
+                    self.selected_index = i
+            return None
+            
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Check arrow clicks first (if already selected)
+            for rect, i, direction in self.arrow_rects:
+                if rect.collidepoint(mouse_x, mouse_y) and i == self.selected_index:
+                    self.adjust_option(direction)
+                    return None
+                    
+            # Check general option clicks
+            for rect, i in self.option_rects:
+                if rect.collidepoint(mouse_x, mouse_y):
+                    self.selected_index = i
+                    opt = self.options[self.selected_index]
+                    if opt == "Aplicar y Volver":
+                        return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "gen_vol": self.general_volume, "mus_vol": self.music_volume}
+                    elif opt == "Volver sin guardar":
+                        return {"action": "BACK"}
+                    else:
+                        # For toggles/values, click central area triggers forward change
+                        self.adjust_option(1)
+                    return None
+            return None
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 self.selected_index = (self.selected_index - 1) % len(self.options)

@@ -156,36 +156,36 @@
         },
         {
             "x": 423,
-            "y": 317,
+            "y": 334,
             "w": 317,
-            "h": 102,
+            "h": 72,
             "name": "upper_left_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 934,
-            "y": 315,
-            "w": 316,
-            "h": 107,
+            "y": 326,
+            "w": 309,
+            "h": 89,
             "name": "upper_right_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 422,
-            "y": 539,
+            "y": 572,
             "w": 321,
-            "h": 104,
+            "h": 74,
             "name": "lower_left_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 930,
-            "y": 549,
+            "y": 577,
             "w": 319,
-            "h": 106,
+            "h": 78,
             "name": "lower_right_computer_island",
             "type": "desk",
             "enabled": true
@@ -210,18 +210,18 @@
         },
         {
             "x": 767,
-            "y": 760,
+            "y": 777,
             "w": 26,
-            "h": 124,
+            "h": 107,
             "name": "bottom_center_crates",
             "type": "crate",
             "enabled": true
         },
         {
             "x": 880,
-            "y": 761,
+            "y": 785,
             "w": 24,
-            "h": 119,
+            "h": 95,
             "name": "bottom_center_barrel",
             "type": "barrel",
             "enabled": true
@@ -384,5 +384,6 @@
     "triggers": [],
     "interactables": [],
     "doors": [],
-    "walkable_zones": []
+    "walkable_zones": [],
+    "pathfinding_cell_size": 48
 }

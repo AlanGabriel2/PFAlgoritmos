@@ -256,11 +256,15 @@ def main():
         return enemy_cls(last_position[0], last_position[1], scale=scale)
 
     def start_combat(room_id):
-        nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy
+        nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy, level_passed_timer, level_passed_done, level_failed_timer, level_failed_done
         current_room = room_id
         load_room_level(current_room)
         trigger_transition("COMBAT", "CIRCLE", 0.03)
         energy -= 1
+        level_passed_timer = 0
+        level_passed_done = False
+        level_failed_timer = 0
+        level_failed_done = False
 
         world_w, world_h = combat_world_size()
         scale = current_level.character_scale if current_level else 1.0
@@ -280,6 +284,14 @@ def main():
         if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
             enemies.append(spawn_enemy(MiniBoss, [(world_w // 2, world_h // 3)]))
     load_room_level(None)
+    last_click_time = 0
+    last_clicked_node = None
+    map_message = ""
+    map_message_timer = 0
+    level_passed_timer = 0
+    level_passed_done = False
+    level_failed_timer = 0
+    level_failed_done = False
     running = True
     while running:
         # Escalar coordenadas del ratón
@@ -328,13 +340,13 @@ def main():
                 debug_enemy_paths = not debug_enemy_paths
                 
             if game_state == "TITLE_SCREEN":
-                action = title_screen.handle_event(event)
+                action = title_screen.handle_event(event, mouse_x, mouse_y)
                 if action == "START":
                     main_menu.time = 0
                     trigger_transition("MAIN_MENU", "FADE", 0.03)
                     
             elif game_state == "MAIN_MENU":
-                action = main_menu.handle_event(event)
+                action = main_menu.handle_event(event, mouse_x, mouse_y)
                 if action == "Continuar Partida":
                     slot = save_mgr.get_latest_slot()
                     data = save_mgr.load_game(slot)
@@ -368,7 +380,7 @@ def main():
                 elif action == "Salir":
                     running = False
             elif game_state == "SLOT_SELECT":
-                action = slot_select_menu.handle_event(event)
+                action = slot_select_menu.handle_event(event, mouse_x, mouse_y)
                 if action == "Regresar":
                     trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
                 elif action and action.startswith("Slot"):
@@ -394,14 +406,14 @@ def main():
                             engine.state = data["nodes_state"]
                             trigger_transition("MAP", "CIRCLE", 0.04)
             elif game_state == "PAUSE":
-                action = pause_menu.handle_event(event)
+                action = pause_menu.handle_event(event, mouse_x, mouse_y)
                 if action == "Continuar":
                     trigger_transition(previous_state, "FADE", 0.08)
                 elif action == "Guardar y Salir al menú principal":
                     save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
                     trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
             elif game_state == "BESTIARY":
-                action = bestiary_menu.handle_event(event)
+                action = bestiary_menu.handle_event(event, mouse_x, mouse_y)
                 if action == "BACK":
                     trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
             elif game_state == "TUTORIAL":
@@ -411,7 +423,7 @@ def main():
                     trigger_transition("BESTIARY", "PIXELATE", 0.03)
                     
             elif game_state == "OPTIONS":
-                action = options_menu.handle_event(event)
+                action = options_menu.handle_event(event, mouse_x, mouse_y)
                 if action:
                     if action["action"] == "BACK":
                         trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
@@ -441,14 +453,23 @@ def main():
                     if event.button == 3: # Clic derecho para arrastrar
                         dragging = True
                         last_mouse_pos = event.pos
-                    elif event.button == 1: # Clic izquierdo para seleccionar habitación
+                    elif event.button == 1: # Clic izquierdo para seleccionar/entrar
                         clicked_node = map_gen.get_room_at(mouse_x, mouse_y, camera_x, camera_y)
                         if clicked_node and engine.state[clicked_node] == NodeState.UNLOCKED:
-                            selected_node = clicked_node # La seleccionamos y entramos
-                            if energy > 0:
-                                start_combat(clicked_node)
+                            current_time = pygame.time.get_ticks()
+                            if clicked_node == last_clicked_node and current_time - last_click_time < 500:
+                                # Doble clic: entrar
+                                selected_node = clicked_node
+                                if energy > 0:
+                                    start_combat(clicked_node)
+                                else:
+                                    map_message = "¡No hay suficiente energía! Descansa para avanzar de semestre."
+                                    map_message_timer = 180
                             else:
-                                print("¡No hay suficiente energía! Descansa para avanzar de semestre.")
+                                # Un clic: seleccionar
+                                selected_node = clicked_node
+                                last_clicked_node = clicked_node
+                                last_click_time = current_time
                                 
                 elif event.type == pygame.MOUSEBUTTONUP:
                     if event.button == 3:
@@ -473,7 +494,8 @@ def main():
                             if energy > 0:
                                 start_combat(selected_node)
                             else:
-                                print("¡No hay suficiente energía! Descansa para avanzar de semestre.")
+                                map_message = "¡No hay suficiente energía! Descansa para avanzar de semestre."
+                                map_message_timer = 180
                                 
                     elif event.key in [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]:
                         if selected_node and selected_node in map_gen.rooms:
@@ -568,9 +590,6 @@ def main():
                     if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
                         combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
                         enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
-                        if combat_player.hp <= 0:
-                            game_state = "MAP" # Expulsado al pasillo
-                            print("¡Fuiste derrotado! La habitación sigue siendo hostil.")
                             
                     # El jugador recibe daño por balas enemigas
                     for b in enemy.bullets[:]:
@@ -579,9 +598,6 @@ def main():
                             combat_player.hp -= 15
                             if b in enemy.bullets:
                                 enemy.bullets.remove(b)
-                            if combat_player.hp <= 0:
-                                trigger_transition("MAP", "CIRCLE", 0.04)
-                                print("¡Fuiste derrotado por un proyectil!")
                 
                 # Las balas golpean a los enemigos
                 for b in combat_player.bullets[:]:
@@ -632,21 +648,38 @@ def main():
     
                 # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
                 if current_wave == max_waves and not enemies:
-                    engine.clean_room(current_room)
-                    engine.update_unlocks()
-                    
-                    # AUTOSAVE
-                    save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
-                    save_indicator_timer = 120
-                    
-                    if current_room == "TIP10TEMTT1":
-                        global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
-                        save_mgr.save_global_save(global_data)
-                        bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]
-    
-                        trigger_transition("WIN", "FADE", 0.02)
-                    else:
-                        trigger_transition("MAP", "CIRCLE", 0.04)
+                    if level_passed_timer == 0 and not level_passed_done:
+                        level_passed_timer = 120 # 2 segundos
+                        
+                    if level_passed_timer > 0:
+                        level_passed_timer -= 1
+                        if level_passed_timer == 0:
+                            level_passed_done = True
+                            engine.clean_room(current_room)
+                            engine.update_unlocks()
+                            
+                            # AUTOSAVE
+                            save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
+                            save_indicator_timer = 120
+                            
+                            if current_room == "TIP10TEMTT1":
+                                global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
+                                save_mgr.save_global_save(global_data)
+                                bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]
+            
+                                trigger_transition("WIN", "FADE", 0.02)
+                            else:
+                                trigger_transition("MAP", "CIRCLE", 0.04)
+                                
+                if combat_player.hp <= 0:
+                    if level_failed_timer == 0 and not level_failed_done:
+                        level_failed_timer = 120 # 2 segundos
+                        
+                    if level_failed_timer > 0:
+                        level_failed_timer -= 1
+                        if level_failed_timer == 0:
+                            level_failed_done = True
+                            trigger_transition("MAP", "CIRCLE", 0.04)
                 
         # Dibujado
         screen.fill(BG_COLOR)
@@ -752,6 +785,18 @@ def main():
                 msg2 = font_md.render("¡ENERGÍA RESTAURADA AL MÁXIMO!", True, (255, 255, 255))
                 msg2.set_alpha(alpha)
                 screen.blit(msg2, msg2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50 - offset_y)))
+
+            if map_message_timer > 0:
+                map_message_timer -= 1
+                msg_surf = font_md.render(map_message, True, (255, 100, 100))
+                msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT - 50))
+                
+                # Dark background
+                bg_rect = msg_rect.inflate(20, 10)
+                s = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+                s.fill((0, 0, 0, 180))
+                screen.blit(s, bg_rect.topleft)
+                screen.blit(msg_surf, msg_rect)
                 
         elif game_state == "COMBAT" or (game_state == "PAUSE" and previous_state == "COMBAT"):
             draw_floor(screen, combat_bg_img, combat_cam_x, combat_cam_y)
@@ -878,6 +923,22 @@ def main():
             room_ts = font_md.render(title, False, title_color)
             # Alineado a la derecha para no chocar con la barra de vida
             screen.blit(room_ts, (WIDTH - room_ts.get_width() - 20, 15))
+            
+            if current_wave == max_waves and not enemies and level_passed_timer > 0:
+                msg_surf = font_lg.render("¡NIVEL SUPERADO!", True, (100, 255, 100))
+                msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT // 3))
+                # Text shadow
+                shadow_surf = font_lg.render("¡NIVEL SUPERADO!", True, (0, 50, 0))
+                screen.blit(shadow_surf, (msg_rect.x + 3, msg_rect.y + 3))
+                screen.blit(msg_surf, msg_rect)
+                
+            if combat_player.hp <= 0 and level_failed_timer > 0:
+                msg_surf = font_lg.render("¡HAS SIDO DERROTADO!", True, (255, 100, 100))
+                msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT // 3))
+                # Text shadow
+                shadow_surf = font_lg.render("¡HAS SIDO DERROTADO!", True, (50, 0, 0))
+                screen.blit(shadow_surf, (msg_rect.x + 3, msg_rect.y + 3))
+                screen.blit(msg_surf, msg_rect)
             
         elif game_state == "WIN":
             if event.type == pygame.KEYDOWN:
