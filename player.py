@@ -25,11 +25,11 @@ def init_player_assets():
         print("No se pudieron cargar los sprites de bala:", e)
 
 class Player:
-    def __init__(self, x, y):
+    def __init__(self, x, y, scale=1.0):
         self.x = x
         self.y = y
-        self.radius = 30 # Escalado 1.5x
-        self.rect = pygame.Rect(0, 0, 51, 57)
+        self.radius = 30 * scale
+        self.rect = pygame.Rect(0, 0, 51 * scale, 57 * scale)
         self.sync_rect_to_position()
         self.last_collision = {"x": False, "y": False}
         self.speed = 5
@@ -42,8 +42,7 @@ class Player:
         self.shoot_cooldown = 0
         
         from animator import Animator
-        # Tamaño escalado 1.5x (96x96)
-        self.animator = Animator("assets/images/player/player_sheet.png", 96, 96, rows=3, cols=4, animation_speed=0.10)
+        self.animator = Animator("assets/images/player/player_sheet.png", int(96 * scale), int(96 * scale), rows=3, cols=4, animation_speed=0.10)
         self.state = 0 # 0: Idle, 1: Walk, 2: Attack
         self.flip = False
 

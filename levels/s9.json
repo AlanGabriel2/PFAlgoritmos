@@ -1,238 +1,400 @@
 {
-    "name":  "s9",
-    "background":  "assets/images/backgrounds/s9.png",
-    "size":  [
-                 1672,
-                 941
-             ],
-    "coordinate_system":  "world coordinates in source background pixels",
-    "player_spawn":  [
-                         836,
-                         470
-                     ],
-    "enemy_spawns":  [
-                         [
-                             836,
-                             245
-                         ],
-                         [
-                             796,
-                             600
-                         ],
-                         [
-                             250,
-                             650
-                         ],
-                         [
-                             1420,
-                             650
-                         ],
-                         [
-                             250,
-                             250
-                         ],
-                         [
-                             1420,
-                             250
-                         ]
-                     ],
-    "colliders":  [
-                      {
-                          "name":  "top_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  -64,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "bottom_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  941,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "left_boundary",
-                          "type":  "boundary",
-                          "x":  -64,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_boundary",
-                          "type":  "boundary",
-                          "x":  1672,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  1672,
-                          "h":  58
-                      },
-                      {
-                          "name":  "bottom_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  878,
-                          "w":  1672,
-                          "h":  63
-                      },
-                      {
-                          "name":  "left_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_wall",
-                          "type":  "wall",
-                          "x":  1616,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_center_security_door",
-                          "type":  "door_block",
-                          "x":  720,
-                          "y":  55,
-                          "w":  235,
-                          "h":  140
-                      },
-                      {
-                          "name":  "bottom_center_security_door",
-                          "type":  "door_block",
-                          "x":  725,
-                          "y":  770,
-                          "w":  225,
-                          "h":  145
-                      },
-                      {
-                          "name":  "top_left_cell_block",
-                          "type":  "cell_block",
-                          "x":  325,
-                          "y":  65,
-                          "w":  375,
-                          "h":  210
-                      },
-                      {
-                          "name":  "top_right_cell_block",
-                          "type":  "cell_block",
-                          "x":  970,
-                          "y":  65,
-                          "w":  375,
-                          "h":  210
-                      },
-                      {
-                          "name":  "bottom_left_cell_block",
-                          "type":  "cell_block",
-                          "x":  310,
-                          "y":  680,
-                          "w":  390,
-                          "h":  215
-                      },
-                      {
-                          "name":  "bottom_right_cell_block",
-                          "type":  "cell_block",
-                          "x":  970,
-                          "y":  680,
-                          "w":  390,
-                          "h":  215
-                      },
-                      {
-                          "name":  "left_central_cell_block",
-                          "type":  "cell_block",
-                          "x":  420,
-                          "y":  330,
-                          "w":  305,
-                          "h":  230
-                      },
-                      {
-                          "name":  "right_central_cell_block",
-                          "type":  "cell_block",
-                          "x":  945,
-                          "y":  330,
-                          "w":  305,
-                          "h":  230
-                      },
-                      {
-                          "name":  "left_laser_grid_blocker",
-                          "type":  "laser_block",
-                          "x":  160,
-                          "y":  335,
-                          "w":  270,
-                          "h":  250
-                      },
-                      {
-                          "name":  "right_laser_grid_blocker",
-                          "type":  "laser_block",
-                          "x":  1240,
-                          "y":  335,
-                          "w":  270,
-                          "h":  250
-                      },
-                      {
-                          "name":  "left_wall_security_posts",
-                          "type":  "machine",
-                          "x":  65,
-                          "y":  295,
-                          "w":  90,
-                          "h":  330
-                      },
-                      {
-                          "name":  "right_wall_security_posts",
-                          "type":  "machine",
-                          "x":  1515,
-                          "y":  295,
-                          "w":  90,
-                          "h":  330
-                      },
-                      {
-                          "name":  "center_bottom_barriers",
-                          "type":  "fence",
-                          "x":  730,
-                          "y":  650,
-                          "w":  220,
-                          "h":  65
-                      }
-                  ],
-    "hazard_zones":  [
-                         {
-                             "name":  "left_laser_grid",
-                             "type":  "laser",
-                             "x":  160,
-                             "y":  335,
-                             "w":  270,
-                             "h":  250,
-                             "damage":  0
-                         },
-                         {
-                             "name":  "right_laser_grid",
-                             "type":  "laser",
-                             "x":  1240,
-                             "y":  335,
-                             "w":  270,
-                             "h":  250,
-                             "damage":  0
-                         }
-                     ],
-    "triggers":  [
-
-                 ],
-    "interactables":  [
-
-                      ],
-    "doors":  [
-
-              ]
+    "name": "s9",
+    "background": "assets/images/backgrounds/s9.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        836,
+        470
+    ],
+    "enemy_spawns": [
+        [
+            836,
+            245
+        ],
+        [
+            796,
+            600
+        ],
+        [
+            250,
+            650
+        ],
+        [
+            1420,
+            650
+        ],
+        [
+            250,
+            250
+        ],
+        [
+            1420,
+            250
+        ]
+    ],
+    "colliders": [
+        {
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 1672,
+            "h": 58,
+            "name": "top_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 847,
+            "w": 1672,
+            "h": 94,
+            "name": "bottom_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 56,
+            "h": 941,
+            "name": "left_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 1616,
+            "y": 0,
+            "w": 56,
+            "h": 941,
+            "name": "right_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 686,
+            "y": -26,
+            "w": 312,
+            "h": 161,
+            "name": "top_center_security_door",
+            "type": "door_block",
+            "enabled": true
+        },
+        {
+            "x": 738,
+            "y": 778,
+            "w": 188,
+            "h": 136,
+            "name": "bottom_center_security_door",
+            "type": "door_block",
+            "enabled": true
+        },
+        {
+            "x": 325,
+            "y": 65,
+            "w": 375,
+            "h": 162,
+            "name": "top_left_cell_block",
+            "type": "cell_block",
+            "enabled": true
+        },
+        {
+            "x": 984,
+            "y": 65,
+            "w": 343,
+            "h": 153,
+            "name": "top_right_cell_block",
+            "type": "cell_block",
+            "enabled": true
+        },
+        {
+            "x": 310,
+            "y": 667,
+            "w": 361,
+            "h": 228,
+            "name": "bottom_left_cell_block",
+            "type": "cell_block",
+            "enabled": true
+        },
+        {
+            "x": 986,
+            "y": 667,
+            "w": 370,
+            "h": 228,
+            "name": "bottom_right_cell_block",
+            "type": "cell_block",
+            "enabled": true
+        },
+        {
+            "x": 425,
+            "y": 314,
+            "w": 270,
+            "h": 185,
+            "name": "left_central_cell_block",
+            "type": "cell_block",
+            "enabled": true
+        },
+        {
+            "x": 956,
+            "y": 313,
+            "w": 284,
+            "h": 187,
+            "name": "right_central_cell_block",
+            "type": "cell_block",
+            "enabled": true
+        },
+        {
+            "x": 65,
+            "y": 284,
+            "w": 79,
+            "h": 50,
+            "name": "left_wall_security_posts",
+            "type": "machine",
+            "enabled": true
+        },
+        {
+            "x": 1526,
+            "y": 281,
+            "w": 79,
+            "h": 45,
+            "name": "right_wall_security_posts",
+            "type": "machine",
+            "enabled": true
+        },
+        {
+            "x": 695,
+            "y": 704,
+            "w": 96,
+            "h": 16,
+            "name": "center_bottom_barriers",
+            "type": "fence",
+            "enabled": true
+        },
+        {
+            "x": 1321,
+            "y": 58,
+            "w": 317,
+            "h": 76,
+            "name": "new_22",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1587,
+            "y": 837,
+            "w": 93,
+            "h": 61,
+            "name": "new_23",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1352,
+            "y": 846,
+            "w": 287,
+            "h": 70,
+            "name": "new_24",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 874,
+            "y": 705,
+            "w": 152,
+            "h": 16,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 55,
+            "y": 55,
+            "w": 272,
+            "h": 87,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 169,
+            "y": 358,
+            "w": 238,
+            "h": 189,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1271,
+            "y": 360,
+            "w": 239,
+            "h": 189,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1077,
+            "y": 304,
+            "w": 45,
+            "h": 29,
+            "name": "new_27",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 541,
+            "y": 303,
+            "w": 45,
+            "h": 27,
+            "name": "new_28",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 666,
+            "y": 655,
+            "w": 16,
+            "h": 30,
+            "name": "new_29",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 980,
+            "y": 654,
+            "w": 20,
+            "h": 24,
+            "name": "new_30",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 949,
+            "y": 668,
+            "w": 19,
+            "h": 36,
+            "name": "new_31",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 697,
+            "y": 667,
+            "w": 18,
+            "h": 37,
+            "name": "new_32",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 277,
+            "y": 797,
+            "w": 25,
+            "h": 33,
+            "name": "new_33",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1372,
+            "y": 796,
+            "w": 25,
+            "h": 33,
+            "name": "new_34",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 147,
+            "y": 333,
+            "w": 21,
+            "h": 38,
+            "name": "new_35",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 49,
+            "y": 572,
+            "w": 95,
+            "h": 43,
+            "name": "new_36",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1527,
+            "y": 571,
+            "w": 112,
+            "h": 44,
+            "name": "new_37",
+            "type": "solid",
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [
+        {
+            "x": 170,
+            "y": 353,
+            "w": 241,
+            "h": 203,
+            "name": "left_laser_grid",
+            "type": "laser",
+            "enabled": true,
+            "damage": 0
+        },
+        {
+            "x": 1264,
+            "y": 347,
+            "w": 246,
+            "h": 204,
+            "name": "right_laser_grid",
+            "type": "laser",
+            "enabled": true,
+            "damage": 0
+        }
+    ],
+    "triggers": [],
+    "interactables": [],
+    "doors": [],
+    "walkable_zones": []
 }

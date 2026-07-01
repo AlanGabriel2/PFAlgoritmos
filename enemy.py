@@ -49,11 +49,11 @@ class EnemyBullet:
         return self.x < 0 or self.x > w or self.y < 0 or self.y > h
 
 class Enemy:
-    def __init__(self, x, y, radius, speed, hp, sheet_path, frame_width, frame_height=None, cols=4, rows=3):
+    def __init__(self, x, y, radius, speed, hp, sheet_path, frame_width, frame_height=None, cols=4, rows=3, scale=1.0):
         self.x = x
         self.y = y
-        self.radius = radius
-        self.rect = pygame.Rect(0, 0, radius * 2, radius * 2)
+        self.radius = radius * scale
+        self.rect = pygame.Rect(0, 0, self.radius * 2, self.radius * 2)
         self.sync_rect_to_position()
         self.last_collision = {"x": False, "y": False}
         self.speed = speed
@@ -68,7 +68,7 @@ class Enemy:
         
         if frame_height is None:
             frame_height = frame_width
-        self.animator = Animator(sheet_path, frame_width, frame_height, rows, cols, 0.15)
+        self.animator = Animator(sheet_path, int(frame_width * scale), int(frame_height * scale), rows, cols, 0.15)
         self.color = (255, 50, 50)
 
     def sync_rect_to_position(self):
@@ -157,13 +157,13 @@ class Enemy:
 # ---- Normal Enemies ----
 
 class BugEnemy(Enemy):
-    def __init__(self, x, y):
+    def __init__(self, x, y, scale=1.0):
         # Tamaño escalado un poco más pequeño
-        super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet.png", 54, cols=6)
+        super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet.png", 54, cols=6, scale=scale)
         self.animator.animation_speed = 0.08
 class SpaghettiEnemy(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 72)
+    def __init__(self, x, y, scale=1.0):
+        super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 72, scale=scale)
     def move_logic(self, player_x, player_y):
         # Erratic movement
         angle = math.atan2(player_y - self.y, player_x - self.x) + random.uniform(-0.5, 0.5)
@@ -172,12 +172,12 @@ class SpaghettiEnemy(Enemy):
         self.state = 1
 
 class MemoryLeakEnemy(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet.png", 48)
+    def __init__(self, x, y, scale=1.0):
+        super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet.png", 48, scale=scale)
 
 class DeadlineEnemy(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet.png", 96)
+    def __init__(self, x, y, scale=1.0):
+        super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet.png", 96, scale=scale)
     def move_logic(self, player_x, player_y):
         dist = math.hypot(player_x - self.x, player_y - self.y)
         speed = 4.0 if dist < 150 else 1.0
@@ -200,8 +200,8 @@ class DeadlineEnemy(Enemy):
 # ---- Bosses ----
 
 class MiniBoss(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, 90, 1.2, 150, "assets/images/enemies/miniboss_sheet.png", 192)
+    def __init__(self, x, y, scale=1.0):
+        super().__init__(x, y, 90, 1.2, 150, "assets/images/enemies/miniboss_sheet.png", 192, scale=scale)
         self.action_timer = 0
         self.animator.animation_speed = 0.08 # Animación un poco más lenta
         
@@ -225,8 +225,8 @@ class MiniBoss(Enemy):
             self.state = 0
 
 class Boss(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, 105, 0.8, 500, "assets/images/enemies/boss_sheet.png", 288, cols=8, rows=4)
+    def __init__(self, x, y, scale=1.0):
+        super().__init__(x, y, 105, 0.8, 500, "assets/images/enemies/boss_sheet.png", 288, cols=8, rows=4, scale=scale)
         self.action_timer = 0
         
     def move_logic(self, player_x, player_y):

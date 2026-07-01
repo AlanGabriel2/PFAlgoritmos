@@ -62,12 +62,14 @@ class Level:
     doors: list = field(default_factory=list)
     walkable_zones: list = field(default_factory=list)
     walkable_metadata: list = field(default_factory=list)
+    character_scale: float = 1.0
 
     @classmethod
     def from_dict(cls, data, fallback_size=(1024, 768)):
         background = data.get("background", "")
         size = tuple(data.get("size") or get_image_size(background, fallback_size))
         player_spawn = tuple(data.get("player_spawn", (size[0] // 2, size[1] // 2)))
+        character_scale = float(data.get("character_scale", 0.7))
 
         colliders = []
         collider_metadata = []
@@ -114,6 +116,7 @@ class Level:
             background=background,
             size=size,
             player_spawn=player_spawn,
+            character_scale=character_scale,
             colliders=colliders,
             collider_metadata=collider_metadata,
             hazard_zones=hazard_zones,

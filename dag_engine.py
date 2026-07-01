@@ -129,6 +129,12 @@ class DagEngine:
                 if can_unlock:
                     self.state[node] = NodeState.UNLOCKED
 
+        # --- MODO PRUEBA: Desbloquear todos los nodos temporalmente ---
+        for node in self.nodes:
+            if self.state[node] == NodeState.LOCKED:
+                self.state[node] = NodeState.UNLOCKED
+        # --------------------------------------------------------------
+
     def clean_room(self, node):
         if self.state[node] == NodeState.UNLOCKED:
             self.state[node] = NodeState.CLEANED

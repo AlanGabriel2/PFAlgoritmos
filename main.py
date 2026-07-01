@@ -222,8 +222,9 @@ def main():
 
     def spawn_enemy(enemy_cls, preferred_positions=None):
         world_w, world_h = combat_world_size()
+        scale = current_level.character_scale if current_level else 1.0
         positions = list(preferred_positions or [])
-        if current_level.enemy_spawns:
+        if current_level and current_level.enemy_spawns:
             level_spawns = list(current_level.enemy_spawns)
             random.shuffle(level_spawns)
             positions.extend(level_spawns)
@@ -237,7 +238,7 @@ def main():
                 y = random.randint(80, max(80, world_h - 80))
             last_position = (x, y)
 
-            enemy = enemy_cls(x, y)
+            enemy = enemy_cls(x, y, scale=scale)
             enemy.sync_rect_to_position()
             if collision_manager and collision_manager.check_collision(enemy.rect):
                 continue
@@ -245,7 +246,7 @@ def main():
                 continue
             return enemy
 
-        return enemy_cls(last_position[0], last_position[1])
+        return enemy_cls(last_position[0], last_position[1], scale=scale)
 
     def start_combat(room_id):
         nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy
@@ -255,7 +256,8 @@ def main():
         energy -= 1
 
         world_w, world_h = combat_world_size()
-        combat_player = Player(*current_level.player_spawn)
+        scale = current_level.character_scale if current_level else 1.0
+        combat_player = Player(current_level.player_spawn[0], current_level.player_spawn[1], scale=scale)
         combat_player.rect.clamp_ip(pygame.Rect(0, 0, world_w, world_h))
         combat_player.sync_position_to_rect()
         update_combat_camera(smooth=False)
