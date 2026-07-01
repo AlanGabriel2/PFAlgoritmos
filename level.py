@@ -60,6 +60,8 @@ class Level:
     enemy_spawns: list = field(default_factory=list)
     interactables: list = field(default_factory=list)
     doors: list = field(default_factory=list)
+    walkable_zones: list = field(default_factory=list)
+    walkable_metadata: list = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data, fallback_size=(1024, 768)):
@@ -93,6 +95,19 @@ class Level:
                     "damage": item.get("damage", 0),
                 }
             )
+            
+        walkable_zones = []
+        walkable_metadata = []
+        for index, item in enumerate(data.get("walkable_zones", [])):
+            rect = pygame.Rect(item["x"], item["y"], item["w"], item["h"])
+            walkable_zones.append(rect)
+            walkable_metadata.append(
+                {
+                    "name": item.get("name", f"walkable_{index}"),
+                    "type": item.get("type", "walkable"),
+                    "enabled": item.get("enabled", True),
+                }
+            )
 
         return cls(
             name=data.get("name", "unnamed_level"),
@@ -107,6 +122,8 @@ class Level:
             enemy_spawns=[tuple(spawn) for spawn in data.get("enemy_spawns", [])],
             interactables=data.get("interactables", []),
             doors=data.get("doors", []),
+            walkable_zones=walkable_zones,
+            walkable_metadata=walkable_metadata,
         )
 
     @property
@@ -146,6 +163,69 @@ class Level:
         if image.get_size() != tuple(self.size):
             image = pygame.transform.scale(image, tuple(self.size))
         return image
+
+    def save_to_file(self):
+        import shutil
+        path = resolve_level_path(self.name)
+        
+        # Build new lists
+        new_colliders = []
+        for r, md in zip(self.colliders, self.collider_metadata):
+            item = {"x": int(r.x), "y": int(r.y), "w": int(r.w), "h": int(r.h)}
+            for k, v in md.items():
+                if k not in ("x", "y", "w", "h"):
+                    item[k] = v
+            new_colliders.append(item)
+            
+        new_hazards = []
+        for r, md in zip(self.hazard_zones, self.hazard_metadata):
+            item = {"x": int(r.x), "y": int(r.y), "w": int(r.w), "h": int(r.h)}
+            for k, v in md.items():
+                if k not in ("x", "y", "w", "h"):
+                    item[k] = v
+            new_hazards.append(item)
+            
+        new_walkables = []
+        for r, md in zip(self.walkable_zones, self.walkable_metadata):
+            item = {"x": int(r.x), "y": int(r.y), "w": int(r.w), "h": int(r.h)}
+            for k, v in md.items():
+                if k not in ("x", "y", "w", "h"):
+                    item[k] = v
+            new_walkables.append(item)
+
+        data = {}
+        if path.exists():
+            # Backup
+            backup_path = path.with_suffix(".json.bak")
+            shutil.copy2(path, backup_path)
+            try:
+                with path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                pass
+        
+        if not data:
+            data = {
+                "name": self.name,
+                "background": self.background,
+                "size": list(self.size),
+                "player_spawn": list(self.player_spawn),
+                "enemy_spawns": [list(s) for s in self.enemy_spawns],
+                "triggers": self.triggers,
+                "interactables": self.interactables,
+                "doors": self.doors
+            }
+            
+        data["colliders"] = new_colliders
+        data["hazard_zones"] = new_hazards
+        data["walkable_zones"] = new_walkables
+        
+        # Ensure directory exists
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
 
 
 def resolve_level_path(level_name_or_path):

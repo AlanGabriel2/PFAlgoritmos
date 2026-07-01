@@ -62,6 +62,9 @@ class Enemy:
         self.attack_cooldown = 0
         self.state = 1 # 1: Move
         self.bullets = []
+        self.evasion_dir = random.choice([-1, 1])
+        self.evasion_timer = 0
+        
         
         if frame_height is None:
             frame_height = frame_width
@@ -78,6 +81,26 @@ class Enemy:
     def update(self, player_x, player_y, width, height, collision_manager=None):
         old_x, old_y = self.x, self.y
         self.move_logic(player_x, player_y)
+        
+        # Evasión general de obstáculos para todos los enemigos
+        if self.last_collision.get("x") or self.last_collision.get("y"):
+            if self.evasion_timer <= 0:
+                self.evasion_timer = 40
+                self.evasion_dir = random.choice([-1, 1])
+
+        if self.evasion_timer > 0:
+            self.evasion_timer -= 1
+            if self.last_collision.get("x"):
+                if abs(player_y - self.y) < 25:
+                    self.y += 3.0 * self.evasion_dir
+                else:
+                    self.y += 3.0 if player_y >= self.y else -3.0
+            if self.last_collision.get("y"):
+                if abs(player_x - self.x) < 25:
+                    self.x += 3.0 * self.evasion_dir
+                else:
+                    self.x += 3.0 if player_x >= self.x else -3.0
+            
         dx = self.x - old_x
         dy = self.y - old_y
 
@@ -135,12 +158,12 @@ class Enemy:
 
 class BugEnemy(Enemy):
     def __init__(self, x, y):
-        # Tamaño escalado 1.5x
-        super().__init__(x, y, 36, 3.0, 20, "assets/images/enemies/bug_sheet.png", 96, cols=6)
+        # Tamaño escalado un poco más pequeño
+        super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet.png", 54, cols=6)
         self.animator.animation_speed = 0.08
 class SpaghettiEnemy(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, 39, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 96)
+        super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 72)
     def move_logic(self, player_x, player_y):
         # Erratic movement
         angle = math.atan2(player_y - self.y, player_x - self.x) + random.uniform(-0.5, 0.5)

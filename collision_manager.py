@@ -4,10 +4,23 @@ import pygame
 
 
 class CollisionManager:
-    def __init__(self, colliders, metadata=None, max_step=8):
+    def __init__(self, colliders, metadata=None, max_step=8, walkable_zones=None, walkable_metadata=None):
         self.max_step = max(1, max_step)
         self.colliders = []
         self.metadata = []
+        self.walkable_zones = []
+        self.walkable_metadata = []
+
+        if walkable_zones:
+            walkable_metadata = walkable_metadata or []
+            for index, zone in enumerate(walkable_zones):
+                rect = self._to_rect(zone)
+                data = walkable_metadata[index].copy() if index < len(walkable_metadata) else {}
+                data.setdefault("name", f"walkable_{index}")
+                data.setdefault("type", "walkable")
+                data.setdefault("enabled", True)
+                self.walkable_zones.append(rect)
+                self.walkable_metadata.append(data)
 
         metadata = metadata or []
         for index, collider in enumerate(colliders):
@@ -32,6 +45,11 @@ class CollisionManager:
 
     def _enabled_colliders(self):
         for rect, data in zip(self.colliders, self.metadata):
+            if data.get("enabled", True):
+                yield rect
+
+    def _enabled_walkable_zones(self):
+        for rect, data in zip(self.walkable_zones, self.walkable_metadata):
             if data.get("enabled", True):
                 yield rect
 
@@ -85,21 +103,40 @@ class CollisionManager:
                 entity.rect.y += int(round(amount))
 
         collisions = [collider for collider in self._enabled_colliders() if entity.rect.colliderect(collider)]
-        if not collisions:
+        
+        walkables = list(self._enabled_walkable_zones())
+        is_outside_walkable = False
+        if walkables:
+            if not any(w.collidepoint(entity.rect.centerx, entity.rect.centery) for w in walkables):
+                is_outside_walkable = True
+
+        if not collisions and not is_outside_walkable:
             return False
 
         if axis == "x":
-            if amount > 0:
-                entity.rect.right = min(collider.left for collider in collisions)
+            if is_outside_walkable:
+                if amount > 0:
+                    entity.rect.x -= int(math.ceil(amount))
+                else:
+                    entity.rect.x -= int(math.floor(amount))
             else:
-                entity.rect.left = max(collider.right for collider in collisions)
+                if amount > 0:
+                    entity.rect.right = min(collider.left for collider in collisions)
+                else:
+                    entity.rect.left = max(collider.right for collider in collisions)
             if hasattr(entity, "x"):
                 entity.x = float(entity.rect.centerx)
         else:
-            if amount > 0:
-                entity.rect.bottom = min(collider.top for collider in collisions)
+            if is_outside_walkable:
+                if amount > 0:
+                    entity.rect.y -= int(math.ceil(amount))
+                else:
+                    entity.rect.y -= int(math.floor(amount))
             else:
-                entity.rect.top = max(collider.bottom for collider in collisions)
+                if amount > 0:
+                    entity.rect.bottom = min(collider.top for collider in collisions)
+                else:
+                    entity.rect.top = max(collider.bottom for collider in collisions)
             if hasattr(entity, "y"):
                 entity.y = float(entity.rect.centery)
 

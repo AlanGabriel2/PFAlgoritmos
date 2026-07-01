@@ -1,205 +1,461 @@
 {
-    "name":  "s5",
-    "background":  "assets/images/backgrounds/s5.png",
-    "size":  [
-                 1672,
-                 941
-             ],
-    "coordinate_system":  "world coordinates in source background pixels",
-    "player_spawn":  [
-                         835,
-                         500
-                     ],
-    "enemy_spawns":  [
-                         [
-                             835,
-                             260
-                         ],
-                         [
-                             815,
-                             780
-                         ],
-                         [
-                             520,
-                             500
-                         ],
-                         [
-                             1170,
-                             500
-                         ],
-                         [
-                             170,
-                             460
-                         ],
-                         [
-                             1370,
-                             300
-                         ]
-                     ],
-    "colliders":  [
-                      {
-                          "name":  "top_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  -64,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "bottom_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  941,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "left_boundary",
-                          "type":  "boundary",
-                          "x":  -64,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_boundary",
-                          "type":  "boundary",
-                          "x":  1672,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  1672,
-                          "h":  58
-                      },
-                      {
-                          "name":  "bottom_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  878,
-                          "w":  1672,
-                          "h":  63
-                      },
-                      {
-                          "name":  "left_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_wall",
-                          "type":  "wall",
-                          "x":  1616,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_left_lounge_block",
-                          "type":  "furniture",
-                          "x":  70,
-                          "y":  70,
-                          "w":  470,
-                          "h":  175
-                      },
-                      {
-                          "name":  "top_center_console",
-                          "type":  "console",
-                          "x":  590,
-                          "y":  70,
-                          "w":  300,
-                          "h":  115
-                      },
-                      {
-                          "name":  "top_right_rooms",
-                          "type":  "furniture",
-                          "x":  1110,
-                          "y":  70,
-                          "w":  430,
-                          "h":  160
-                      },
-                      {
-                          "name":  "center_left_sofa_table",
-                          "type":  "table",
-                          "x":  205,
-                          "y":  280,
-                          "w":  270,
-                          "h":  125
-                      },
-                      {
-                          "name":  "large_bio_tank",
-                          "type":  "machine",
-                          "x":  35,
-                          "y":  510,
-                          "w":  295,
-                          "h":  220
-                      },
-                      {
-                          "name":  "bottom_left_console_bank",
-                          "type":  "console",
-                          "x":  65,
-                          "y":  760,
-                          "w":  430,
-                          "h":  100
-                      },
-                      {
-                          "name":  "center_floor_grate_a",
-                          "type":  "grate",
-                          "x":  1035,
-                          "y":  330,
-                          "w":  115,
-                          "h":  115
-                      },
-                      {
-                          "name":  "center_floor_grate_b",
-                          "type":  "grate",
-                          "x":  1210,
-                          "y":  520,
-                          "w":  120,
-                          "h":  120
-                      },
-                      {
-                          "name":  "right_pipe_cluster",
-                          "type":  "pipe",
-                          "x":  1300,
-                          "y":  470,
-                          "w":  280,
-                          "h":  250
-                      },
-                      {
-                          "name":  "bottom_right_industrial_block",
-                          "type":  "machine",
-                          "x":  1320,
-                          "y":  735,
-                          "w":  235,
-                          "h":  120
-                      },
-                      {
-                          "name":  "small_center_machine",
-                          "type":  "machine",
-                          "x":  760,
-                          "y":  650,
-                          "w":  100,
-                          "h":  80
-                      }
-                  ],
-    "hazard_zones":  [
-
-                     ],
-    "triggers":  [
-
-                 ],
-    "interactables":  [
-
-                      ],
-    "doors":  [
-
-              ]
+    "name": "s5",
+    "background": "assets/images/backgrounds/s5.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        835,
+        500
+    ],
+    "enemy_spawns": [
+        [
+            835,
+            260
+        ],
+        [
+            815,
+            780
+        ],
+        [
+            520,
+            500
+        ],
+        [
+            1170,
+            500
+        ],
+        [
+            170,
+            460
+        ],
+        [
+            1370,
+            300
+        ]
+    ],
+    "colliders": [
+        {
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 5,
+            "y": -13,
+            "w": 1672,
+            "h": 58,
+            "name": "top_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 878,
+            "w": 1672,
+            "h": 63,
+            "name": "bottom_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": -19,
+            "y": -43,
+            "w": 56,
+            "h": 941,
+            "name": "left_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 1616,
+            "y": 0,
+            "w": 56,
+            "h": 941,
+            "name": "right_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 394,
+            "y": 91,
+            "w": 150,
+            "h": 69,
+            "name": "top_left_lounge_block",
+            "type": "furniture",
+            "enabled": true
+        },
+        {
+            "x": 728,
+            "y": 179,
+            "w": 70,
+            "h": 41,
+            "name": "top_center_console",
+            "type": "console",
+            "enabled": true
+        },
+        {
+            "x": 51,
+            "y": -58,
+            "w": 1448,
+            "h": 160,
+            "name": "top_right_rooms",
+            "type": "furniture",
+            "enabled": true
+        },
+        {
+            "x": 296,
+            "y": 222,
+            "w": 174,
+            "h": 21,
+            "name": "center_left_sofa_table",
+            "type": "table",
+            "enabled": true
+        },
+        {
+            "x": 25,
+            "y": 465,
+            "w": 270,
+            "h": 232,
+            "name": "large_bio_tank",
+            "type": "machine",
+            "enabled": true
+        },
+        {
+            "x": 110,
+            "y": 792,
+            "w": 314,
+            "h": 100,
+            "name": "bottom_left_console_bank",
+            "type": "console",
+            "enabled": true
+        },
+        {
+            "x": 1494,
+            "y": 594,
+            "w": 152,
+            "h": 284,
+            "name": "right_pipe_cluster",
+            "type": "pipe",
+            "enabled": true
+        },
+        {
+            "x": 1345,
+            "y": 690,
+            "w": 235,
+            "h": 181,
+            "name": "bottom_right_industrial_block",
+            "type": "machine",
+            "enabled": true
+        },
+        {
+            "x": 648,
+            "y": 772,
+            "w": 100,
+            "h": 131,
+            "name": "small_center_machine",
+            "type": "machine",
+            "enabled": true
+        },
+        {
+            "x": 993,
+            "y": 707,
+            "w": 59,
+            "h": 192,
+            "name": "new_20",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1137,
+            "y": 850,
+            "w": 75,
+            "h": 61,
+            "name": "new_21",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1563,
+            "y": 512,
+            "w": 51,
+            "h": 77,
+            "name": "new_22",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1544,
+            "y": 252,
+            "w": 83,
+            "h": 56,
+            "name": "new_23",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 745,
+            "y": 98,
+            "w": 38,
+            "h": 82,
+            "name": "new_24",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 662,
+            "y": 81,
+            "w": 25,
+            "h": 139,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 245,
+            "y": 101,
+            "w": 610,
+            "h": 30,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 113,
+            "y": 47,
+            "w": 133,
+            "h": 120,
+            "name": "new_27",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 36,
+            "y": 87,
+            "w": 144,
+            "h": 132,
+            "name": "new_28",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 255,
+            "y": 195,
+            "w": 24,
+            "h": 29,
+            "name": "new_29",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 350,
+            "y": 292,
+            "w": 65,
+            "h": 18,
+            "name": "new_30",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 456,
+            "y": 229,
+            "w": 16,
+            "h": 38,
+            "name": "new_31",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 296,
+            "y": 235,
+            "w": 16,
+            "h": 30,
+            "name": "new_32",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 59,
+            "y": 287,
+            "w": 31,
+            "h": 32,
+            "name": "new_33",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 59,
+            "y": 209,
+            "w": 27,
+            "h": 89,
+            "name": "new_34",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 422,
+            "y": 830,
+            "w": 77,
+            "h": 52,
+            "name": "new_35",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 489,
+            "y": 795,
+            "w": 108,
+            "h": 119,
+            "name": "new_36",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 595,
+            "y": 809,
+            "w": 92,
+            "h": 69,
+            "name": "new_37",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 11,
+            "y": 833,
+            "w": 37,
+            "h": 51,
+            "name": "new_38",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 28,
+            "y": 858,
+            "w": 42,
+            "h": 57,
+            "name": "new_39",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 37,
+            "y": 848,
+            "w": 20,
+            "h": 21,
+            "name": "new_40",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 31,
+            "y": 403,
+            "w": 28,
+            "h": 73,
+            "name": "new_41",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1521,
+            "y": 139,
+            "w": 65,
+            "h": 83,
+            "name": "new_40",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1544,
+            "y": 221,
+            "w": 90,
+            "h": 44,
+            "name": "new_41",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1497,
+            "y": 35,
+            "w": 128,
+            "h": 104,
+            "name": "new_42",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 409,
+            "y": 528,
+            "w": 37,
+            "h": 44,
+            "name": "new_43",
+            "type": "solid",
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [
+        {
+            "x": 1034,
+            "y": 221,
+            "w": 87,
+            "h": 89,
+            "name": "center_floor_grate_a",
+            "type": "hazard",
+            "enabled": true
+        },
+        {
+            "x": 1217,
+            "y": 384,
+            "w": 96,
+            "h": 119,
+            "name": "center_floor_grate_b",
+            "type": "hazard",
+            "enabled": true
+        },
+        {
+            "x": 1495,
+            "y": 425,
+            "w": 68,
+            "h": 76,
+            "name": "new_40",
+            "type": "hazard",
+            "enabled": true
+        }
+    ],
+    "triggers": [],
+    "interactables": [],
+    "doors": [],
+    "walkable_zones": []
 }

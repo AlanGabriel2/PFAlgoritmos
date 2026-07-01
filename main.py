@@ -10,6 +10,7 @@ from map_generator import MapGenerator
 from player import Player, init_player_assets
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
 from level import load_combat_level
+from collision_editor import CollisionEditor
 from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu
 from tutorial import TutorialState
 
@@ -149,6 +150,8 @@ def main():
     combat_bg_img = FLOOR_IMG
     debug_collisions = False
     debug_collision_labels = False
+    editor_mode = False
+    editor = CollisionEditor(current_level, collision_manager)
     
     combat_cam_x, combat_cam_y = 0, 0
     
@@ -211,9 +214,10 @@ def main():
         return None
 
     def load_room_level(room_id):
-        nonlocal current_level, collision_manager, combat_bg_img
+        nonlocal current_level, collision_manager, combat_bg_img, editor
         current_level = load_combat_level(room_id, fallback_size=(ARENA_W, ARENA_H))
         collision_manager = current_level.create_collision_manager()
+        editor = CollisionEditor(current_level, collision_manager)
         combat_bg_img = load_level_background(current_level)
 
     def spawn_enemy(enemy_cls, preferred_positions=None):
@@ -300,6 +304,10 @@ def main():
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
                 debug_collisions = not debug_collisions
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F2:
+                editor_mode = not editor_mode
+                if editor_mode:
+                    debug_collisions = True # force display in editor mode
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F3:
                 debug_collision_labels = not debug_collision_labels
                 if debug_collision_labels:
                     debug_collisions = True
@@ -479,6 +487,21 @@ def main():
                                 camera_y = HEIGHT//2 - target_room.rect.centery
                         
             elif game_state == "COMBAT":
+                if editor_mode:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                        dragging = True
+                        last_mouse_pos = (mouse_x, mouse_y)
+                    elif event.type == pygame.MOUSEBUTTONUP and event.button == 3:
+                        dragging = False
+                    elif event.type == pygame.MOUSEMOTION and dragging:
+                        dx = mouse_x - last_mouse_pos[0]
+                        dy = mouse_y - last_mouse_pos[1]
+                        combat_cam_x += dx
+                        combat_cam_y += dy
+                        last_mouse_pos = (mouse_x, mouse_y)
+                        
+                    editor.handle_event(event, mouse_x, mouse_y, combat_cam_x, combat_cam_y)
+                    continue
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     previous_state = "COMBAT"
                     trigger_transition("PAUSE", "FADE", 0.08)
@@ -498,116 +521,117 @@ def main():
             tutorial_state.update(keys, WIDTH, HEIGHT)
         elif game_state == "COMBAT":
             world_w, world_h = combat_world_size()
-            # Disparar con flechas (soporta diagonales)
-            dx, dy = 0, 0
-            if keys[pygame.K_UP]: dy -= 1
-            if keys[pygame.K_DOWN]: dy += 1
-            if keys[pygame.K_LEFT]: dx -= 1
-            if keys[pygame.K_RIGHT]: dx += 1
-            
-            if dx != 0 or dy != 0:
-                combat_player.shoot_angle(math.atan2(dy, dx))
+            if not editor_mode:
+                # Disparar con flechas (soporta diagonales)
+                dx, dy = 0, 0
+                if keys[pygame.K_UP]: dy -= 1
+                if keys[pygame.K_DOWN]: dy += 1
+                if keys[pygame.K_LEFT]: dx -= 1
+                if keys[pygame.K_RIGHT]: dx += 1
                 
-            # Mouse drag shooting
-            if pygame.mouse.get_pressed()[0]:
-                combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
+                if dx != 0 or dy != 0:
+                    combat_player.shoot_angle(math.atan2(dy, dx))
+                    
+                # Mouse drag shooting
+                if pygame.mouse.get_pressed()[0]:
+                    combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
+                    
+                combat_player.move(keys, world_w, world_h, collision_manager)
+                combat_player.update_bullets(world_w, world_h)
                 
-            combat_player.move(keys, world_w, world_h, collision_manager)
-            combat_player.update_bullets(world_w, world_h)
-            
-            update_combat_camera(smooth=True)
-            
-            for enemy in enemies:
-                enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager)
+                update_combat_camera(smooth=True)
                 
-                if isinstance(enemy, MiniBoss):
-                    bestiary_menu.unlock("MINI BOSS (PARCIAL)")
-                elif isinstance(enemy, Boss):
-                    bestiary_menu.unlock("MEGA BOSS (TITULACIÓN)")
-                
-                # El jugador recibe daño por contacto
-                if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
-                    combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
-                    enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
-                    if combat_player.hp <= 0:
-                        game_state = "MAP" # Expulsado al pasillo
-                        print("¡Fuiste derrotado! La habitación sigue siendo hostil.")
-                        
-                # El jugador recibe daño por balas enemigas
-                for b in enemy.bullets[:]:
-                    dist = math.hypot(combat_player.x - b.x, combat_player.y - b.y)
-                    if dist < (combat_player.radius + b.radius):
-                        combat_player.hp -= 15
-                        if b in enemy.bullets:
-                            enemy.bullets.remove(b)
+                for enemy in enemies:
+                    enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager)
+                    
+                    if isinstance(enemy, MiniBoss):
+                        bestiary_menu.unlock("MINI BOSS (PARCIAL)")
+                    elif isinstance(enemy, Boss):
+                        bestiary_menu.unlock("MEGA BOSS (TITULACIÓN)")
+                    
+                    # El jugador recibe daño por contacto
+                    if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
+                        combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
+                        enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
                         if combat_player.hp <= 0:
-                            trigger_transition("MAP", "CIRCLE", 0.04)
-                            print("¡Fuiste derrotado por un proyectil!")
-            
-            # Las balas golpean a los enemigos
-            for b in combat_player.bullets[:]:
-                for e in enemies[:]:
-                    if e.collides_with_bullet(b):
-                        damage = 10
-                        e.hp -= damage
-                        
-                        # Generar texto flotante de daño
-                        floating_texts.append({
-                            "text": str(damage),
-                            "x": e.x,
-                            "y": e.y - 20,
-                            "life": 40,
-                            "color": (255, 50, 50)
-                        })
-                        
-                        if b in combat_player.bullets:
-                            combat_player.bullets.remove(b)
-                        if e.hp <= 0:
-                            enemies.remove(e)
-            
-            # Actualizar textos flotantes
-            for ft in floating_texts[:]:
-                ft["y"] -= 1.5  # Subir
-                ft["life"] -= 1 # Desvanecerse
-                if ft["life"] <= 0:
-                    floating_texts.remove(ft)
-            
-            # Spawnear nuevas rondas
-            if current_wave < max_waves:
-                wave_timer -= 1
-                if wave_timer <= 0:
-                    current_wave += 1
-                    wave_timer = 300 # Reset timer para la siguiente ola
-                    
-                    # Spawn desde la puerta del nivel activo
-                    door_x, door_y = int(world_w * 0.85), int(world_h * 0.22)
-                    enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
-                    
-                    for _ in range(random.randint(3, 5)):
-                        ex = door_x + random.randint(-20, 20)
-                        ey = door_y + random.randint(-20, 20)
-                        enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
-                        
-                    if current_wave == max_waves and current_room in engine.critical_nodes and current_room != "TIP10TEMTT1":
-                        enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
-
-            # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
-            if current_wave == max_waves and not enemies:
-                engine.clean_room(current_room)
-                engine.update_unlocks()
+                            game_state = "MAP" # Expulsado al pasillo
+                            print("¡Fuiste derrotado! La habitación sigue siendo hostil.")
+                            
+                    # El jugador recibe daño por balas enemigas
+                    for b in enemy.bullets[:]:
+                        dist = math.hypot(combat_player.x - b.x, combat_player.y - b.y)
+                        if dist < (combat_player.radius + b.radius):
+                            combat_player.hp -= 15
+                            if b in enemy.bullets:
+                                enemy.bullets.remove(b)
+                            if combat_player.hp <= 0:
+                                trigger_transition("MAP", "CIRCLE", 0.04)
+                                print("¡Fuiste derrotado por un proyectil!")
                 
-                # AUTOSAVE
-                save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
-                save_indicator_timer = 120
+                # Las balas golpean a los enemigos
+                for b in combat_player.bullets[:]:
+                    for e in enemies[:]:
+                        if e.collides_with_bullet(b):
+                            damage = 10
+                            e.hp -= damage
+                            
+                            # Generar texto flotante de daño
+                            floating_texts.append({
+                                "text": str(damage),
+                                "x": e.x,
+                                "y": e.y - 20,
+                                "life": 40,
+                                "color": (255, 50, 50)
+                            })
+                            
+                            if b in combat_player.bullets:
+                                combat_player.bullets.remove(b)
+                            if e.hp <= 0:
+                                enemies.remove(e)
                 
-                if current_room == "TIP10TEMTT1":
-                    global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
-                    save_mgr.save_global_save(global_data)
-                    bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]
-
-                    trigger_transition("WIN", "FADE", 0.02)
-                else:
-                    trigger_transition("MAP", "CIRCLE", 0.04)
+                # Actualizar textos flotantes
+                for ft in floating_texts[:]:
+                    ft["y"] -= 1.5  # Subir
+                    ft["life"] -= 1 # Desvanecerse
+                    if ft["life"] <= 0:
+                        floating_texts.remove(ft)
+                
+                # Spawnear nuevas rondas
+                if current_wave < max_waves:
+                    wave_timer -= 1
+                    if wave_timer <= 0:
+                        current_wave += 1
+                        wave_timer = 300 # Reset timer para la siguiente ola
+                        
+                        # Spawn desde la puerta del nivel activo
+                        door_x, door_y = int(world_w * 0.85), int(world_h * 0.22)
+                        enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
+                        
+                        for _ in range(random.randint(3, 5)):
+                            ex = door_x + random.randint(-20, 20)
+                            ey = door_y + random.randint(-20, 20)
+                            enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
+                            
+                        if current_wave == max_waves and current_room in engine.critical_nodes and current_room != "TIP10TEMTT1":
+                            enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
+    
+                # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
+                if current_wave == max_waves and not enemies:
+                    engine.clean_room(current_room)
+                    engine.update_unlocks()
+                    
+                    # AUTOSAVE
+                    save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
+                    save_indicator_timer = 120
+                    
+                    if current_room == "TIP10TEMTT1":
+                        global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
+                        save_mgr.save_global_save(global_data)
+                        bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]
+    
+                        trigger_transition("WIN", "FADE", 0.02)
+                    else:
+                        trigger_transition("MAP", "CIRCLE", 0.04)
                 
         # Dibujado
         screen.fill(BG_COLOR)
@@ -728,7 +752,9 @@ def main():
                 rect = dmg_surf.get_rect(center=(int(ft["x"] + combat_cam_x), int(ft["y"] + combat_cam_y)))
                 screen.blit(dmg_surf, rect)
 
-            if debug_collisions and collision_manager:
+            if editor_mode:
+                editor.draw(screen, combat_cam_x, combat_cam_y)
+            elif debug_collisions and collision_manager:
                 collision_manager.draw_debug(
                     screen,
                     camera=(combat_cam_x, combat_cam_y),
@@ -754,7 +780,7 @@ def main():
                     debug_lines = [
                         f"Nivel: {current_level.name}  Mundo: {current_level.width}x{current_level.height}",
                         f"Jugador: {int(combat_player.x)}, {int(combat_player.y)}  Bloqueo: X={combat_player.last_collision.get('x')} Y={combat_player.last_collision.get('y')}",
-                        "F1: solidos/hazards | F2: nombres/ajuste",
+                        "F1: debug colisiones | F2: Modo Editor | F3: etiquetas",
                     ]
                     info_y = 68
                     for line in debug_lines:

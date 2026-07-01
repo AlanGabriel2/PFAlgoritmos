@@ -1,229 +1,388 @@
 {
-    "name":  "s1",
-    "background":  "assets/images/backgrounds/s1.png",
-    "size":  [
-                 1672,
-                 941
-             ],
-    "coordinate_system":  "world coordinates in source background pixels",
-    "player_spawn":  [
-                         836,
-                         720
-                     ],
-    "enemy_spawns":  [
-                         [
-                             836,
-                             220
-                         ],
-                         [
-                             836,
-                             470
-                         ],
-                         [
-                             250,
-                             510
-                         ],
-                         [
-                             1420,
-                             510
-                         ],
-                         [
-                             510,
-                             735
-                         ],
-                         [
-                             1160,
-                             735
-                         ]
-                     ],
-    "colliders":  [
-                      {
-                          "name":  "top_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  -64,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "bottom_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  941,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "left_boundary",
-                          "type":  "boundary",
-                          "x":  -64,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_boundary",
-                          "type":  "boundary",
-                          "x":  1672,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  1672,
-                          "h":  58
-                      },
-                      {
-                          "name":  "bottom_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  878,
-                          "w":  1672,
-                          "h":  63
-                      },
-                      {
-                          "name":  "left_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_wall",
-                          "type":  "wall",
-                          "x":  1616,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_left_server_stack",
-                          "type":  "server_rack",
-                          "x":  70,
-                          "y":  70,
-                          "w":  155,
-                          "h":  245
-                      },
-                      {
-                          "name":  "top_right_server_stack",
-                          "type":  "server_rack",
-                          "x":  1445,
-                          "y":  70,
-                          "w":  155,
-                          "h":  245
-                      },
-                      {
-                          "name":  "top_blackboard",
-                          "type":  "wall_console",
-                          "x":  615,
-                          "y":  55,
-                          "w":  450,
-                          "h":  110
-                      },
-                      {
-                          "name":  "top_left_wall_terminal",
-                          "type":  "console",
-                          "x":  275,
-                          "y":  90,
-                          "w":  95,
-                          "h":  90
-                      },
-                      {
-                          "name":  "top_right_wall_terminal",
-                          "type":  "console",
-                          "x":  1295,
-                          "y":  90,
-                          "w":  95,
-                          "h":  90
-                      },
-                      {
-                          "name":  "upper_left_computer_island",
-                          "type":  "desk",
-                          "x":  415,
-                          "y":  300,
-                          "w":  300,
-                          "h":  135
-                      },
-                      {
-                          "name":  "upper_right_computer_island",
-                          "type":  "desk",
-                          "x":  930,
-                          "y":  300,
-                          "w":  300,
-                          "h":  135
-                      },
-                      {
-                          "name":  "lower_left_computer_island",
-                          "type":  "desk",
-                          "x":  415,
-                          "y":  505,
-                          "w":  300,
-                          "h":  135
-                      },
-                      {
-                          "name":  "lower_right_computer_island",
-                          "type":  "desk",
-                          "x":  930,
-                          "y":  505,
-                          "w":  300,
-                          "h":  135
-                      },
-                      {
-                          "name":  "bottom_left_terminal",
-                          "type":  "desk",
-                          "x":  245,
-                          "y":  760,
-                          "w":  150,
-                          "h":  90
-                      },
-                      {
-                          "name":  "bottom_right_terminal",
-                          "type":  "desk",
-                          "x":  1280,
-                          "y":  760,
-                          "w":  150,
-                          "h":  90
-                      },
-                      {
-                          "name":  "bottom_center_steps",
-                          "type":  "stairs_block",
-                          "x":  700,
-                          "y":  830,
-                          "w":  275,
-                          "h":  95
-                      },
-                      {
-                          "name":  "bottom_center_crates",
-                          "type":  "crate",
-                          "x":  720,
-                          "y":  760,
-                          "w":  75,
-                          "h":  55
-                      },
-                      {
-                          "name":  "bottom_center_barrel",
-                          "type":  "barrel",
-                          "x":  885,
-                          "y":  760,
-                          "w":  55,
-                          "h":  55
-                      }
-                  ],
-    "hazard_zones":  [
-
-                     ],
-    "triggers":  [
-
-                 ],
-    "interactables":  [
-
-                      ],
-    "doors":  [
-
-              ]
+    "name": "s1",
+    "background": "assets/images/backgrounds/s1.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        836,
+        720
+    ],
+    "enemy_spawns": [
+        [
+            836,
+            220
+        ],
+        [
+            836,
+            470
+        ],
+        [
+            250,
+            510
+        ],
+        [
+            1420,
+            510
+        ],
+        [
+            510,
+            735
+        ],
+        [
+            1160,
+            735
+        ]
+    ],
+    "colliders": [
+        {
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 1672,
+            "h": 58,
+            "name": "top_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 864,
+            "w": 1672,
+            "h": 77,
+            "name": "bottom_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": -35,
+            "y": 199,
+            "w": 56,
+            "h": 731,
+            "name": "left_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 1653,
+            "y": 0,
+            "w": 19,
+            "h": 941,
+            "name": "right_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 111,
+            "y": 97,
+            "w": 64,
+            "h": 115,
+            "name": "top_left_server_stack",
+            "type": "server_rack",
+            "enabled": true
+        },
+        {
+            "x": 1445,
+            "y": 70,
+            "w": 119,
+            "h": 144,
+            "name": "top_right_server_stack",
+            "type": "server_rack",
+            "enabled": true
+        },
+        {
+            "x": 572,
+            "y": 67,
+            "w": 1040,
+            "h": 110,
+            "name": "top_blackboard",
+            "type": "wall_console",
+            "enabled": true
+        },
+        {
+            "x": 214,
+            "y": 156,
+            "w": 144,
+            "h": 72,
+            "name": "top_left_wall_terminal",
+            "type": "console",
+            "enabled": true
+        },
+        {
+            "x": 1279,
+            "y": 148,
+            "w": 144,
+            "h": 74,
+            "name": "top_right_wall_terminal",
+            "type": "console",
+            "enabled": true
+        },
+        {
+            "x": 423,
+            "y": 317,
+            "w": 317,
+            "h": 102,
+            "name": "upper_left_computer_island",
+            "type": "desk",
+            "enabled": true
+        },
+        {
+            "x": 934,
+            "y": 315,
+            "w": 316,
+            "h": 107,
+            "name": "upper_right_computer_island",
+            "type": "desk",
+            "enabled": true
+        },
+        {
+            "x": 422,
+            "y": 539,
+            "w": 321,
+            "h": 104,
+            "name": "lower_left_computer_island",
+            "type": "desk",
+            "enabled": true
+        },
+        {
+            "x": 930,
+            "y": 549,
+            "w": 319,
+            "h": 106,
+            "name": "lower_right_computer_island",
+            "type": "desk",
+            "enabled": true
+        },
+        {
+            "x": 222,
+            "y": 766,
+            "w": 159,
+            "h": 100,
+            "name": "bottom_left_terminal",
+            "type": "desk",
+            "enabled": true
+        },
+        {
+            "x": 1280,
+            "y": 760,
+            "w": 150,
+            "h": 90,
+            "name": "bottom_right_terminal",
+            "type": "desk",
+            "enabled": true
+        },
+        {
+            "x": 767,
+            "y": 760,
+            "w": 26,
+            "h": 124,
+            "name": "bottom_center_crates",
+            "type": "crate",
+            "enabled": true
+        },
+        {
+            "x": 880,
+            "y": 761,
+            "w": 24,
+            "h": 119,
+            "name": "bottom_center_barrel",
+            "type": "barrel",
+            "enabled": true
+        },
+        {
+            "x": 10,
+            "y": 672,
+            "w": 72,
+            "h": 25,
+            "name": "new_22",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 61,
+            "y": 692,
+            "w": 23,
+            "h": 171,
+            "name": "new_23",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 37,
+            "y": 523,
+            "w": 61,
+            "h": 84,
+            "name": "new_24",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 37,
+            "y": 344,
+            "w": 61,
+            "h": 106,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 67,
+            "y": 64,
+            "w": 419,
+            "h": 91,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 470,
+            "y": 25,
+            "w": 119,
+            "h": 80,
+            "name": "new_27",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 465,
+            "y": 150,
+            "w": 22,
+            "h": 49,
+            "name": "new_28",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 565,
+            "y": 150,
+            "w": 25,
+            "h": 48,
+            "name": "new_29",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1572,
+            "y": 342,
+            "w": 63,
+            "h": 124,
+            "name": "new_30",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1571,
+            "y": 497,
+            "w": 66,
+            "h": 128,
+            "name": "new_31",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1530,
+            "y": 685,
+            "w": 43,
+            "h": 43,
+            "name": "new_32",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1505,
+            "y": 716,
+            "w": 94,
+            "h": 65,
+            "name": "new_33",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1587,
+            "y": 694,
+            "w": 20,
+            "h": 173,
+            "name": "new_34",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 267,
+            "y": 736,
+            "w": 64,
+            "h": 42,
+            "name": "new_35",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 3,
+            "y": 61,
+            "w": 81,
+            "h": 214,
+            "name": "new_36",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1587,
+            "y": 180,
+            "w": 75,
+            "h": 89,
+            "name": "new_37",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1588,
+            "y": 694,
+            "w": 66,
+            "h": 23,
+            "name": "new_38",
+            "type": "solid",
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [],
+    "triggers": [],
+    "interactables": [],
+    "doors": [],
+    "walkable_zones": []
 }

@@ -1,197 +1,442 @@
 {
-    "name":  "s7",
-    "background":  "assets/images/backgrounds/s7.png",
-    "size":  [
-                 1672,
-                 941
-             ],
-    "coordinate_system":  "world coordinates in source background pixels",
-    "player_spawn":  [
-                         836,
-                         470
-                     ],
-    "enemy_spawns":  [
-                         [
-                             816,
-                             250
-                         ],
-                         [
-                             836,
-                             710
-                         ],
-                         [
-                             190,
-                             340
-                         ],
-                         [
-                             1510,
-                             320
-                         ],
-                         [
-                             720,
-                             620
-                         ],
-                         [
-                             980,
-                             620
-                         ]
-                     ],
-    "colliders":  [
-                      {
-                          "name":  "top_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  -64,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "bottom_boundary",
-                          "type":  "boundary",
-                          "x":  0,
-                          "y":  941,
-                          "w":  1672,
-                          "h":  64
-                      },
-                      {
-                          "name":  "left_boundary",
-                          "type":  "boundary",
-                          "x":  -64,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_boundary",
-                          "type":  "boundary",
-                          "x":  1672,
-                          "y":  0,
-                          "w":  64,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  1672,
-                          "h":  58
-                      },
-                      {
-                          "name":  "bottom_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  878,
-                          "w":  1672,
-                          "h":  63
-                      },
-                      {
-                          "name":  "left_wall",
-                          "type":  "wall",
-                          "x":  0,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "right_wall",
-                          "type":  "wall",
-                          "x":  1616,
-                          "y":  0,
-                          "w":  56,
-                          "h":  941
-                      },
-                      {
-                          "name":  "top_left_robot_station",
-                          "type":  "workbench",
-                          "x":  250,
-                          "y":  145,
-                          "w":  305,
-                          "h":  150
-                      },
-                      {
-                          "name":  "top_right_large_robot",
-                          "type":  "robot",
-                          "x":  1110,
-                          "y":  105,
-                          "w":  350,
-                          "h":  260
-                      },
-                      {
-                          "name":  "mid_left_workbench",
-                          "type":  "workbench",
-                          "x":  245,
-                          "y":  405,
-                          "w":  365,
-                          "h":  170
-                      },
-                      {
-                          "name":  "mid_right_workbench",
-                          "type":  "workbench",
-                          "x":  1065,
-                          "y":  405,
-                          "w":  365,
-                          "h":  170
-                      },
-                      {
-                          "name":  "bottom_left_workbench",
-                          "type":  "workbench",
-                          "x":  250,
-                          "y":  665,
-                          "w":  360,
-                          "h":  150
-                      },
-                      {
-                          "name":  "bottom_right_robot_station",
-                          "type":  "robot",
-                          "x":  1085,
-                          "y":  635,
-                          "w":  370,
-                          "h":  175
-                      },
-                      {
-                          "name":  "top_crates",
-                          "type":  "crate",
-                          "x":  650,
-                          "y":  120,
-                          "w":  245,
-                          "h":  80
-                      },
-                      {
-                          "name":  "bottom_center_door",
-                          "type":  "door_block",
-                          "x":  720,
-                          "y":  815,
-                          "w":  240,
-                          "h":  110
-                      },
-                      {
-                          "name":  "right_wall_crates",
-                          "type":  "crate",
-                          "x":  1480,
-                          "y":  430,
-                          "w":  90,
-                          "h":  170
-                      },
-                      {
-                          "name":  "left_wall_crates",
-                          "type":  "crate",
-                          "x":  80,
-                          "y":  520,
-                          "w":  115,
-                          "h":  130
-                      }
-                  ],
-    "hazard_zones":  [
-
-                     ],
-    "triggers":  [
-
-                 ],
-    "interactables":  [
-
-                      ],
-    "doors":  [
-
-              ]
+    "name": "s7",
+    "background": "assets/images/backgrounds/s7.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        836,
+        470
+    ],
+    "enemy_spawns": [
+        [
+            816,
+            250
+        ],
+        [
+            836,
+            710
+        ],
+        [
+            190,
+            340
+        ],
+        [
+            1510,
+            320
+        ],
+        [
+            720,
+            620
+        ],
+        [
+            980,
+            620
+        ]
+    ],
+    "colliders": [
+        {
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 1672,
+            "h": 58,
+            "name": "top_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 878,
+            "w": 1672,
+            "h": 63,
+            "name": "bottom_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 56,
+            "h": 941,
+            "name": "left_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 1616,
+            "y": 0,
+            "w": 56,
+            "h": 941,
+            "name": "right_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 508,
+            "y": 81,
+            "w": 97,
+            "h": 54,
+            "name": "top_left_robot_station",
+            "type": "workbench",
+            "enabled": true
+        },
+        {
+            "x": 1275,
+            "y": 71,
+            "w": 244,
+            "h": 235,
+            "name": "top_right_large_robot",
+            "type": "robot",
+            "enabled": true
+        },
+        {
+            "x": 337,
+            "y": 405,
+            "w": 240,
+            "h": 86,
+            "name": "mid_left_workbench",
+            "type": "workbench",
+            "enabled": true
+        },
+        {
+            "x": 1135,
+            "y": 381,
+            "w": 171,
+            "h": 90,
+            "name": "mid_right_workbench",
+            "type": "workbench",
+            "enabled": true
+        },
+        {
+            "x": 250,
+            "y": 665,
+            "w": 248,
+            "h": 61,
+            "name": "bottom_left_workbench",
+            "type": "workbench",
+            "enabled": true
+        },
+        {
+            "x": 1121,
+            "y": 635,
+            "w": 212,
+            "h": 81,
+            "name": "bottom_right_robot_station",
+            "type": "robot",
+            "enabled": true
+        },
+        {
+            "x": 1006,
+            "y": 72,
+            "w": 50,
+            "h": 111,
+            "name": "top_crates",
+            "type": "crate",
+            "enabled": true
+        },
+        {
+            "x": 894,
+            "y": 735,
+            "w": 16,
+            "h": 164,
+            "name": "bottom_center_door",
+            "type": "door_block",
+            "enabled": true
+        },
+        {
+            "x": 1566,
+            "y": 464,
+            "w": 90,
+            "h": 194,
+            "name": "right_wall_crates",
+            "type": "crate",
+            "enabled": true
+        },
+        {
+            "x": 84,
+            "y": 450,
+            "w": 123,
+            "h": 46,
+            "name": "left_wall_crates",
+            "type": "crate",
+            "enabled": true
+        },
+        {
+            "x": 528,
+            "y": 386,
+            "w": 52,
+            "h": 30,
+            "name": "new_19",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 285,
+            "y": 421,
+            "w": 60,
+            "h": 49,
+            "name": "new_20",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 71,
+            "y": 542,
+            "w": 29,
+            "h": 49,
+            "name": "new_21",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 82,
+            "y": 622,
+            "w": 58,
+            "h": 40,
+            "name": "new_22",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 94,
+            "y": 597,
+            "w": 51,
+            "h": 46,
+            "name": "new_23",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 71,
+            "y": 704,
+            "w": 85,
+            "h": 125,
+            "name": "new_24",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 218,
+            "y": 637,
+            "w": 44,
+            "h": 81,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 220,
+            "y": 709,
+            "w": 30,
+            "h": 42,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 78,
+            "y": 339,
+            "w": 59,
+            "h": 65,
+            "name": "new_27",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 53,
+            "y": 104,
+            "w": 45,
+            "h": 202,
+            "name": "new_28",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 52,
+            "y": 57,
+            "w": 1539,
+            "h": 45,
+            "name": "new_29",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1572,
+            "y": 31,
+            "w": 71,
+            "h": 359,
+            "name": "new_30",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1531,
+            "y": 641,
+            "w": 173,
+            "h": 72,
+            "name": "new_31",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1414,
+            "y": 828,
+            "w": 327,
+            "h": 82,
+            "name": "new_32",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1392,
+            "y": 646,
+            "w": 74,
+            "h": 44,
+            "name": "new_33",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 246,
+            "y": 206,
+            "w": 229,
+            "h": 121,
+            "name": "new_34",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1205,
+            "y": 183,
+            "w": 16,
+            "h": 50,
+            "name": "new_35",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 541,
+            "y": 212,
+            "w": 16,
+            "h": 46,
+            "name": "new_36",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 758,
+            "y": 732,
+            "w": 16,
+            "h": 153,
+            "name": "new_37",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 772,
+            "y": 761,
+            "w": 129,
+            "h": 136,
+            "name": "new_38",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 901,
+            "y": 808,
+            "w": 82,
+            "h": 80,
+            "name": "new_39",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 978,
+            "y": 823,
+            "w": 56,
+            "h": 54,
+            "name": "new_40",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 50,
+            "y": 840,
+            "w": 206,
+            "h": 66,
+            "name": "new_41",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 300,
+            "y": 829,
+            "w": 18,
+            "h": 60,
+            "name": "new_42",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 518,
+            "y": 841,
+            "w": 20,
+            "h": 68,
+            "name": "new_43",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 682,
+            "y": 823,
+            "w": 30,
+            "h": 86,
+            "name": "new_44",
+            "type": "solid",
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [],
+    "triggers": [],
+    "interactables": [],
+    "doors": [],
+    "walkable_zones": []
 }
