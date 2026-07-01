@@ -1,10 +1,10 @@
 {
     "bestiary_unlocks": [
-        "MEGA BOSS (TITULACION)",
-        "MEMORY LEAK",
         "EL RELOJ (DEADLINE)",
-        "BUG",
-        "CODIGO SPAGHETTI"
+        "CODIGO SPAGHETTI",
+        "MEMORY LEAK",
+        "MEGA BOSS (TITULACION)",
+        "BUG"
     ],
     "volume": 0.5,
     "resolution": 0

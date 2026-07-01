@@ -1,0 +1,205 @@
+{
+    "name":  "s5",
+    "background":  "assets/images/backgrounds/s5.png",
+    "size":  [
+                 1672,
+                 941
+             ],
+    "coordinate_system":  "world coordinates in source background pixels",
+    "player_spawn":  [
+                         835,
+                         500
+                     ],
+    "enemy_spawns":  [
+                         [
+                             835,
+                             260
+                         ],
+                         [
+                             815,
+                             780
+                         ],
+                         [
+                             520,
+                             500
+                         ],
+                         [
+                             1170,
+                             500
+                         ],
+                         [
+                             170,
+                             460
+                         ],
+                         [
+                             1370,
+                             300
+                         ]
+                     ],
+    "colliders":  [
+                      {
+                          "name":  "top_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  -64,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "bottom_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  941,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "left_boundary",
+                          "type":  "boundary",
+                          "x":  -64,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_boundary",
+                          "type":  "boundary",
+                          "x":  1672,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  1672,
+                          "h":  58
+                      },
+                      {
+                          "name":  "bottom_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  878,
+                          "w":  1672,
+                          "h":  63
+                      },
+                      {
+                          "name":  "left_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_wall",
+                          "type":  "wall",
+                          "x":  1616,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_left_lounge_block",
+                          "type":  "furniture",
+                          "x":  70,
+                          "y":  70,
+                          "w":  470,
+                          "h":  175
+                      },
+                      {
+                          "name":  "top_center_console",
+                          "type":  "console",
+                          "x":  590,
+                          "y":  70,
+                          "w":  300,
+                          "h":  115
+                      },
+                      {
+                          "name":  "top_right_rooms",
+                          "type":  "furniture",
+                          "x":  1110,
+                          "y":  70,
+                          "w":  430,
+                          "h":  160
+                      },
+                      {
+                          "name":  "center_left_sofa_table",
+                          "type":  "table",
+                          "x":  205,
+                          "y":  280,
+                          "w":  270,
+                          "h":  125
+                      },
+                      {
+                          "name":  "large_bio_tank",
+                          "type":  "machine",
+                          "x":  35,
+                          "y":  510,
+                          "w":  295,
+                          "h":  220
+                      },
+                      {
+                          "name":  "bottom_left_console_bank",
+                          "type":  "console",
+                          "x":  65,
+                          "y":  760,
+                          "w":  430,
+                          "h":  100
+                      },
+                      {
+                          "name":  "center_floor_grate_a",
+                          "type":  "grate",
+                          "x":  1035,
+                          "y":  330,
+                          "w":  115,
+                          "h":  115
+                      },
+                      {
+                          "name":  "center_floor_grate_b",
+                          "type":  "grate",
+                          "x":  1210,
+                          "y":  520,
+                          "w":  120,
+                          "h":  120
+                      },
+                      {
+                          "name":  "right_pipe_cluster",
+                          "type":  "pipe",
+                          "x":  1300,
+                          "y":  470,
+                          "w":  280,
+                          "h":  250
+                      },
+                      {
+                          "name":  "bottom_right_industrial_block",
+                          "type":  "machine",
+                          "x":  1320,
+                          "y":  735,
+                          "w":  235,
+                          "h":  120
+                      },
+                      {
+                          "name":  "small_center_machine",
+                          "type":  "machine",
+                          "x":  760,
+                          "y":  650,
+                          "w":  100,
+                          "h":  80
+                      }
+                  ],
+    "hazard_zones":  [
+
+                     ],
+    "triggers":  [
+
+                 ],
+    "interactables":  [
+
+                      ],
+    "doors":  [
+
+              ]
+}

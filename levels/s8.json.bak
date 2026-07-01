@@ -1,0 +1,210 @@
+{
+    "name": "s8",
+    "background": "assets/images/backgrounds/s8.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        836,
+        500
+    ],
+    "enemy_spawns": [
+        [
+            836,
+            210
+        ],
+        [
+            736,
+            640
+        ],
+        [
+            300,
+            470
+        ],
+        [
+            1370,
+            470
+        ],
+        [
+            620,
+            650
+        ],
+        [
+            1040,
+            650
+        ]
+    ],
+    "colliders": [
+        {
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 1672,
+            "h": 125,
+            "name": "void_top",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 835,
+            "w": 1672,
+            "h": 106,
+            "name": "void_bottom",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 110,
+            "h": 941,
+            "name": "void_left",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 1560,
+            "y": 0,
+            "w": 112,
+            "h": 941,
+            "name": "void_right",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 110,
+            "y": 125,
+            "w": 150,
+            "h": 120,
+            "name": "void_top_left_notch",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 1410,
+            "y": 125,
+            "w": 150,
+            "h": 120,
+            "name": "void_top_right_notch",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 110,
+            "y": 705,
+            "w": 150,
+            "h": 130,
+            "name": "void_bottom_left_notch",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 1410,
+            "y": 705,
+            "w": 150,
+            "h": 130,
+            "name": "void_bottom_right_notch",
+            "type": "void",
+            "enabled": true
+        },
+        {
+            "x": 365,
+            "y": 175,
+            "w": 105,
+            "h": 150,
+            "name": "upper_left_bio_pillar",
+            "type": "pillar",
+            "enabled": true
+        },
+        {
+            "x": 1257,
+            "y": 114,
+            "w": 105,
+            "h": 150,
+            "name": "upper_right_bio_pillar",
+            "type": "pillar",
+            "enabled": true
+        },
+        {
+            "x": 455,
+            "y": 500,
+            "w": 90,
+            "h": 120,
+            "name": "center_left_node",
+            "type": "pillar",
+            "enabled": true
+        },
+        {
+            "x": 1125,
+            "y": 500,
+            "w": 90,
+            "h": 120,
+            "name": "center_right_node",
+            "type": "pillar",
+            "enabled": true
+        },
+        {
+            "x": 785,
+            "y": 640,
+            "w": 105,
+            "h": 110,
+            "name": "lower_center_node",
+            "type": "pillar",
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [
+        {
+            "x": 775,
+            "y": 405,
+            "w": 125,
+            "h": 115,
+            "name": "central_neural_energy",
+            "type": "energy_hazard",
+            "enabled": true,
+            "damage": 0
+        }
+    ],
+    "triggers": [],
+    "interactables": [],
+    "doors": [],
+    "walkable_zones": []
+}

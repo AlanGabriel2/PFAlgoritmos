@@ -9,6 +9,8 @@ from dag_engine import DagEngine, NodeState
 from map_generator import MapGenerator
 from player import Player, init_player_assets
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
+from enemy_ai import draw_enemy_ai_debug
+from pathfinding import PathFinder
 from level import load_combat_level
 from collision_editor import CollisionEditor
 from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu
@@ -147,9 +149,11 @@ def main():
     enemies = []
     current_level = load_combat_level(fallback_size=(ARENA_W, ARENA_H))
     collision_manager = current_level.create_collision_manager()
+    pathfinder = PathFinder(current_level)
     combat_bg_img = FLOOR_IMG
     debug_collisions = False
     debug_collision_labels = False
+    debug_enemy_paths = False
     editor_mode = False
     editor = CollisionEditor(current_level, collision_manager)
     
@@ -214,9 +218,10 @@ def main():
         return None
 
     def load_room_level(room_id):
-        nonlocal current_level, collision_manager, combat_bg_img, editor
+        nonlocal current_level, collision_manager, combat_bg_img, editor, pathfinder
         current_level = load_combat_level(room_id, fallback_size=(ARENA_W, ARENA_H))
         collision_manager = current_level.create_collision_manager()
+        pathfinder = PathFinder(current_level)
         editor = CollisionEditor(current_level, collision_manager)
         combat_bg_img = load_level_background(current_level)
 
@@ -241,6 +246,8 @@ def main():
             enemy = enemy_cls(x, y, scale=scale)
             enemy.sync_rect_to_position()
             if collision_manager and collision_manager.check_collision(enemy.rect):
+                continue
+            if pathfinder and not pathfinder.is_position_walkable((enemy.x, enemy.y), (enemy.rect.w, enemy.rect.h), allow_hazards=False):
                 continue
             if combat_player and enemy.rect.colliderect(combat_player.rect.inflate(180, 180)):
                 continue
@@ -309,10 +316,16 @@ def main():
                 editor_mode = not editor_mode
                 if editor_mode:
                     debug_collisions = True # force display in editor mode
+                else:
+                    collision_manager = current_level.create_collision_manager()
+                    pathfinder = PathFinder(current_level)
+                    editor = CollisionEditor(current_level, collision_manager)
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F3:
                 debug_collision_labels = not debug_collision_labels
                 if debug_collision_labels:
                     debug_collisions = True
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                debug_enemy_paths = not debug_enemy_paths
                 
             if game_state == "TITLE_SCREEN":
                 action = title_screen.handle_event(event)
@@ -544,7 +557,7 @@ def main():
                 update_combat_camera(smooth=True)
                 
                 for enemy in enemies:
-                    enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager)
+                    enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager, pathfinder=pathfinder, nearby_enemies=enemies)
                     
                     if isinstance(enemy, MiniBoss):
                         bestiary_menu.unlock("MINI BOSS (PARCIAL)")
@@ -754,6 +767,16 @@ def main():
                 rect = dmg_surf.get_rect(center=(int(ft["x"] + combat_cam_x), int(ft["y"] + combat_cam_y)))
                 screen.blit(dmg_surf, rect)
 
+            if debug_enemy_paths and pathfinder:
+                draw_enemy_ai_debug(
+                    screen,
+                    enemies,
+                    pathfinder,
+                    camera=(combat_cam_x, combat_cam_y),
+                    font=font_sm,
+                    player_pos=(combat_player.x, combat_player.y),
+                )
+
             if editor_mode:
                 editor.draw(screen, combat_cam_x, combat_cam_y)
             elif debug_collisions and collision_manager:
@@ -782,7 +805,7 @@ def main():
                     debug_lines = [
                         f"Nivel: {current_level.name}  Mundo: {current_level.width}x{current_level.height}",
                         f"Jugador: {int(combat_player.x)}, {int(combat_player.y)}  Bloqueo: X={combat_player.last_collision.get('x')} Y={combat_player.last_collision.get('y')}",
-                        "F1: debug colisiones | F2: Modo Editor | F3: etiquetas",
+                        "F1: debug colisiones | F2: Modo Editor | F3: etiquetas | F4: rutas IA",
                     ]
                     info_y = 68
                     for line in debug_lines:

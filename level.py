@@ -63,6 +63,7 @@ class Level:
     walkable_zones: list = field(default_factory=list)
     walkable_metadata: list = field(default_factory=list)
     character_scale: float = 1.0
+    pathfinding_cell_size: int = 48
 
     @classmethod
     def from_dict(cls, data, fallback_size=(1024, 768)):
@@ -70,6 +71,7 @@ class Level:
         size = tuple(data.get("size") or get_image_size(background, fallback_size))
         player_spawn = tuple(data.get("player_spawn", (size[0] // 2, size[1] // 2)))
         character_scale = float(data.get("character_scale", 0.7))
+        pathfinding_cell_size = int(data.get("pathfinding_cell_size", 48))
 
         colliders = []
         collider_metadata = []
@@ -117,6 +119,7 @@ class Level:
             size=size,
             player_spawn=player_spawn,
             character_scale=character_scale,
+            pathfinding_cell_size=pathfinding_cell_size,
             colliders=colliders,
             collider_metadata=collider_metadata,
             hazard_zones=hazard_zones,
@@ -142,7 +145,12 @@ class Level:
         return pygame.Rect(0, 0, self.width, self.height)
 
     def create_collision_manager(self):
-        return CollisionManager(self.colliders, self.collider_metadata)
+        return CollisionManager(
+            self.colliders,
+            self.collider_metadata,
+            walkable_zones=self.walkable_zones,
+            walkable_metadata=self.walkable_metadata,
+        )
 
     def draw_hazard_debug(self, surface, camera=None, font=None, show_names=False):
         offset_x, offset_y = 0, 0
@@ -222,6 +230,7 @@ class Level:
         data["colliders"] = new_colliders
         data["hazard_zones"] = new_hazards
         data["walkable_zones"] = new_walkables
+        data["pathfinding_cell_size"] = int(self.pathfinding_cell_size)
         
         # Ensure directory exists
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -274,6 +283,7 @@ def build_default_combat_level(size=(1024, 768)):
         "background": "assets/images/backgrounds/floor_tile.png",
         "size": [width, height],
         "player_spawn": [width // 2, height // 2],
+        "pathfinding_cell_size": 48,
         "enemy_spawns": [
             [width // 2, 120],
             [width // 2, height - 120],

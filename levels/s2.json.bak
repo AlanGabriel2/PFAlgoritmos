@@ -1,0 +1,237 @@
+{
+    "name":  "s2",
+    "background":  "assets/images/backgrounds/s2.png",
+    "size":  [
+                 1672,
+                 941
+             ],
+    "coordinate_system":  "world coordinates in source background pixels",
+    "player_spawn":  [
+                         896,
+                         560
+                     ],
+    "enemy_spawns":  [
+                         [
+                             836,
+                             188
+                         ],
+                         [
+                             836,
+                             735
+                         ],
+                         [
+                             260,
+                             490
+                         ],
+                         [
+                             1470,
+                             490
+                         ],
+                         [
+                             420,
+                             335
+                         ],
+                         [
+                             1170,
+                             650
+                         ]
+                     ],
+    "colliders":  [
+                      {
+                          "name":  "top_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  -64,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "bottom_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  941,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "left_boundary",
+                          "type":  "boundary",
+                          "x":  -64,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_boundary",
+                          "type":  "boundary",
+                          "x":  1672,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  1672,
+                          "h":  58
+                      },
+                      {
+                          "name":  "bottom_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  878,
+                          "w":  1672,
+                          "h":  63
+                      },
+                      {
+                          "name":  "left_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_wall",
+                          "type":  "wall",
+                          "x":  1616,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_left_bookshelves",
+                          "type":  "bookshelf",
+                          "x":  140,
+                          "y":  65,
+                          "w":  425,
+                          "h":  78
+                      },
+                      {
+                          "name":  "top_center_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  720,
+                          "y":  65,
+                          "w":  235,
+                          "h":  76
+                      },
+                      {
+                          "name":  "top_right_bookshelves",
+                          "type":  "bookshelf",
+                          "x":  1085,
+                          "y":  65,
+                          "w":  410,
+                          "h":  78
+                      },
+                      {
+                          "name":  "left_wall_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  70,
+                          "y":  165,
+                          "w":  135,
+                          "h":  335
+                      },
+                      {
+                          "name":  "mid_left_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  325,
+                          "y":  210,
+                          "w":  250,
+                          "h":  80
+                      },
+                      {
+                          "name":  "mid_center_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  705,
+                          "y":  230,
+                          "w":  260,
+                          "h":  80
+                      },
+                      {
+                          "name":  "mid_right_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  1100,
+                          "y":  215,
+                          "w":  285,
+                          "h":  82
+                      },
+                      {
+                          "name":  "lower_left_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  300,
+                          "y":  435,
+                          "w":  350,
+                          "h":  82
+                      },
+                      {
+                          "name":  "lower_center_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  755,
+                          "y":  430,
+                          "w":  190,
+                          "h":  84
+                      },
+                      {
+                          "name":  "lower_right_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  1085,
+                          "y":  430,
+                          "w":  330,
+                          "h":  84
+                      },
+                      {
+                          "name":  "bottom_left_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  235,
+                          "y":  705,
+                          "w":  420,
+                          "h":  86
+                      },
+                      {
+                          "name":  "bottom_right_bookshelf",
+                          "type":  "bookshelf",
+                          "x":  1050,
+                          "y":  700,
+                          "w":  435,
+                          "h":  88
+                      },
+                      {
+                          "name":  "small_left_reading_table",
+                          "type":  "table",
+                          "x":  210,
+                          "y":  330,
+                          "w":  90,
+                          "h":  110
+                      },
+                      {
+                          "name":  "small_center_reading_table",
+                          "type":  "table",
+                          "x":  775,
+                          "y":  560,
+                          "w":  95,
+                          "h":  120
+                      },
+                      {
+                          "name":  "small_right_reading_table",
+                          "type":  "table",
+                          "x":  1360,
+                          "y":  330,
+                          "w":  95,
+                          "h":  120
+                      }
+                  ],
+    "hazard_zones":  [
+
+                     ],
+    "triggers":  [
+
+                 ],
+    "interactables":  [
+
+                      ],
+    "doors":  [
+
+              ]
+}
