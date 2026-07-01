@@ -1,0 +1,238 @@
+{
+    "name":  "s9",
+    "background":  "assets/images/backgrounds/s9.png",
+    "size":  [
+                 1672,
+                 941
+             ],
+    "coordinate_system":  "world coordinates in source background pixels",
+    "player_spawn":  [
+                         836,
+                         470
+                     ],
+    "enemy_spawns":  [
+                         [
+                             836,
+                             245
+                         ],
+                         [
+                             796,
+                             600
+                         ],
+                         [
+                             250,
+                             650
+                         ],
+                         [
+                             1420,
+                             650
+                         ],
+                         [
+                             250,
+                             250
+                         ],
+                         [
+                             1420,
+                             250
+                         ]
+                     ],
+    "colliders":  [
+                      {
+                          "name":  "top_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  -64,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "bottom_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  941,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "left_boundary",
+                          "type":  "boundary",
+                          "x":  -64,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_boundary",
+                          "type":  "boundary",
+                          "x":  1672,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  1672,
+                          "h":  58
+                      },
+                      {
+                          "name":  "bottom_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  878,
+                          "w":  1672,
+                          "h":  63
+                      },
+                      {
+                          "name":  "left_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_wall",
+                          "type":  "wall",
+                          "x":  1616,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_center_security_door",
+                          "type":  "door_block",
+                          "x":  720,
+                          "y":  55,
+                          "w":  235,
+                          "h":  140
+                      },
+                      {
+                          "name":  "bottom_center_security_door",
+                          "type":  "door_block",
+                          "x":  725,
+                          "y":  770,
+                          "w":  225,
+                          "h":  145
+                      },
+                      {
+                          "name":  "top_left_cell_block",
+                          "type":  "cell_block",
+                          "x":  325,
+                          "y":  65,
+                          "w":  375,
+                          "h":  210
+                      },
+                      {
+                          "name":  "top_right_cell_block",
+                          "type":  "cell_block",
+                          "x":  970,
+                          "y":  65,
+                          "w":  375,
+                          "h":  210
+                      },
+                      {
+                          "name":  "bottom_left_cell_block",
+                          "type":  "cell_block",
+                          "x":  310,
+                          "y":  680,
+                          "w":  390,
+                          "h":  215
+                      },
+                      {
+                          "name":  "bottom_right_cell_block",
+                          "type":  "cell_block",
+                          "x":  970,
+                          "y":  680,
+                          "w":  390,
+                          "h":  215
+                      },
+                      {
+                          "name":  "left_central_cell_block",
+                          "type":  "cell_block",
+                          "x":  420,
+                          "y":  330,
+                          "w":  305,
+                          "h":  230
+                      },
+                      {
+                          "name":  "right_central_cell_block",
+                          "type":  "cell_block",
+                          "x":  945,
+                          "y":  330,
+                          "w":  305,
+                          "h":  230
+                      },
+                      {
+                          "name":  "left_laser_grid_blocker",
+                          "type":  "laser_block",
+                          "x":  160,
+                          "y":  335,
+                          "w":  270,
+                          "h":  250
+                      },
+                      {
+                          "name":  "right_laser_grid_blocker",
+                          "type":  "laser_block",
+                          "x":  1240,
+                          "y":  335,
+                          "w":  270,
+                          "h":  250
+                      },
+                      {
+                          "name":  "left_wall_security_posts",
+                          "type":  "machine",
+                          "x":  65,
+                          "y":  295,
+                          "w":  90,
+                          "h":  330
+                      },
+                      {
+                          "name":  "right_wall_security_posts",
+                          "type":  "machine",
+                          "x":  1515,
+                          "y":  295,
+                          "w":  90,
+                          "h":  330
+                      },
+                      {
+                          "name":  "center_bottom_barriers",
+                          "type":  "fence",
+                          "x":  730,
+                          "y":  650,
+                          "w":  220,
+                          "h":  65
+                      }
+                  ],
+    "hazard_zones":  [
+                         {
+                             "name":  "left_laser_grid",
+                             "type":  "laser",
+                             "x":  160,
+                             "y":  335,
+                             "w":  270,
+                             "h":  250,
+                             "damage":  0
+                         },
+                         {
+                             "name":  "right_laser_grid",
+                             "type":  "laser",
+                             "x":  1240,
+                             "y":  335,
+                             "w":  270,
+                             "h":  250,
+                             "damage":  0
+                         }
+                     ],
+    "triggers":  [
+
+                 ],
+    "interactables":  [
+
+                      ],
+    "doors":  [
+
+              ]
+}

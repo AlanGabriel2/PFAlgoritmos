@@ -31,6 +31,7 @@ class Player:
         self.radius = 30 # Escalado 1.5x
         self.rect = pygame.Rect(0, 0, 51, 57)
         self.sync_rect_to_position()
+        self.last_collision = {"x": False, "y": False}
         self.speed = 5
         self.hp = 100
         self.max_hp = 100
@@ -82,13 +83,14 @@ class Player:
         dy *= self.speed
 
         if collision_manager:
-            collision_manager.move_and_collide(self, dx, dy)
+            self.last_collision = collision_manager.move_and_collide(self, dx, dy)
         else:
             self.x += dx
             self.y += dy
             self.sync_rect_to_position()
             self.rect.clamp_ip(pygame.Rect(0, 0, width, height))
             self.sync_position_to_rect()
+            self.last_collision = {"x": False, "y": False}
 
         if moved and self.shoot_cooldown == 0:
             self.state = 1 # Walk

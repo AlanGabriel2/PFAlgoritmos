@@ -90,46 +90,18 @@ BG_COLOR = (20, 20, 25)
 TEXT_COLOR = (255, 255, 255)
 
 
-import os
-
-SEMESTER_BGS = {}
-
-def get_semester_bg(room_id, width, height):
-    if not room_id or len(room_id) < 5:
-        return FLOOR_IMG
-        
-    try:
-        semester_num = int(room_id[3:5])
-    except:
-        return FLOOR_IMG
-        
-    if semester_num in SEMESTER_BGS:
-        return SEMESTER_BGS[semester_num]
-        
-    # Intentar cargar la imagen (probando .png y .jpg)
-    loaded_img = None
-    base_path = f"assets/images/backgrounds/s{semester_num}"
-    
-    if os.path.exists(f"{base_path}.png"):
-        loaded_img = pygame.image.load(f"{base_path}.png").convert()
-    elif os.path.exists(f"{base_path}.jpg"):
-        loaded_img = pygame.image.load(f"{base_path}.jpg").convert()
-        
-    if loaded_img:
-        scaled_img = pygame.transform.scale(loaded_img, (width, height))
-        SEMESTER_BGS[semester_num] = scaled_img
-        return scaled_img
-        
 ARENA_W = int(WIDTH * 1.5)
 ARENA_H = int(HEIGHT * 1.5)
 
-def draw_floor(surface, room_id, offset_x=0, offset_y=0):
 
-    bg = get_semester_bg(room_id, ARENA_W, ARENA_H)
-    if bg:
-        surface.blit(bg, (offset_x, offset_y))
+def draw_floor(surface, background, offset_x=0, offset_y=0):
+    if background:
+        surface.blit(background, (int(offset_x), int(offset_y)))
+    elif FLOOR_IMG:
+        surface.blit(FLOOR_IMG, (int(offset_x), int(offset_y)))
     else:
         pygame.draw.rect(surface, (40, 30, 30), (0, 0, WIDTH, HEIGHT))
+
 
 def main():
     save_mgr = save_manager
@@ -176,6 +148,7 @@ def main():
     collision_manager = current_level.create_collision_manager()
     combat_bg_img = FLOOR_IMG
     debug_collisions = False
+    debug_collision_labels = False
     
     combat_cam_x, combat_cam_y = 0, 0
     
@@ -202,15 +175,40 @@ def main():
         trans_state["old_surf"] = screen.copy()
         game_state = target
 
+    def combat_world_size():
+        return current_level.width, current_level.height
+
+    def clamp_camera_axis(target, world_size, viewport_size):
+        if world_size <= viewport_size:
+            return (viewport_size - world_size) // 2
+        return min(0, max(viewport_size - world_size, target))
+
+    def update_combat_camera(smooth=True):
+        nonlocal combat_cam_x, combat_cam_y
+        if not combat_player:
+            return
+        world_w, world_h = combat_world_size()
+        target_cam_x = WIDTH // 2 - combat_player.x
+        target_cam_y = HEIGHT // 2 - combat_player.y
+        target_cam_x = clamp_camera_axis(target_cam_x, world_w, WIDTH)
+        target_cam_y = clamp_camera_axis(target_cam_y, world_h, HEIGHT)
+        if smooth:
+            combat_cam_x += (target_cam_x - combat_cam_x) * 0.1
+            combat_cam_y += (target_cam_y - combat_cam_y) * 0.1
+        else:
+            combat_cam_x = target_cam_x
+            combat_cam_y = target_cam_y
+
     def load_level_background(level):
-        if not level.background:
-            return FLOOR_IMG
         try:
-            image = pygame.image.load(level.background).convert()
-            return pygame.transform.scale(image, tuple(level.size))
+            image = level.load_background()
+            if image:
+                return image
         except Exception as e:
             print(f"No se pudo cargar el fondo del nivel {level.name}: {e}")
-            return FLOOR_IMG
+        if FLOOR_IMG:
+            return pygame.transform.scale(FLOOR_IMG, tuple(level.size))
+        return None
 
     def load_room_level(room_id):
         nonlocal current_level, collision_manager, combat_bg_img
@@ -219,26 +217,27 @@ def main():
         combat_bg_img = load_level_background(current_level)
 
     def spawn_enemy(enemy_cls, preferred_positions=None):
+        world_w, world_h = combat_world_size()
         positions = list(preferred_positions or [])
         if current_level.enemy_spawns:
             level_spawns = list(current_level.enemy_spawns)
             random.shuffle(level_spawns)
             positions.extend(level_spawns)
 
-        last_position = positions[0] if positions else (WIDTH // 2, HEIGHT // 2)
+        last_position = positions[0] if positions else (world_w // 2, world_h // 2)
         for attempt in range(80):
             if attempt < len(positions):
                 x, y = positions[attempt]
             else:
-                x = random.randint(80, WIDTH - 80)
-                y = random.randint(80, HEIGHT - 80)
+                x = random.randint(80, max(80, world_w - 80))
+                y = random.randint(80, max(80, world_h - 80))
             last_position = (x, y)
 
             enemy = enemy_cls(x, y)
             enemy.sync_rect_to_position()
             if collision_manager and collision_manager.check_collision(enemy.rect):
                 continue
-            if combat_player and enemy.rect.colliderect(combat_player.rect.inflate(140, 140)):
+            if combat_player and enemy.rect.colliderect(combat_player.rect.inflate(180, 180)):
                 continue
             return enemy
 
@@ -251,7 +250,12 @@ def main():
         trigger_transition("COMBAT", "CIRCLE", 0.03)
         energy -= 1
 
+        world_w, world_h = combat_world_size()
         combat_player = Player(*current_level.player_spawn)
+        combat_player.rect.clamp_ip(pygame.Rect(0, 0, world_w, world_h))
+        combat_player.sync_position_to_rect()
+        update_combat_camera(smooth=False)
+
         current_wave = 1
         max_waves = 1 + (semester_counter // 2)
         wave_timer = 300
@@ -259,10 +263,9 @@ def main():
         enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
         enemies = [spawn_enemy(random.choice(enemy_types)) for _ in range(random.randint(3, 6))]
         if current_room == "TIP10TEMTT1":
-            enemies.append(spawn_enemy(Boss, [(ARENA_W // 2, 100)]))
+            enemies.append(spawn_enemy(Boss, [(world_w // 2, 140)]))
         if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
-            enemies.append(spawn_enemy(MiniBoss, [(ARENA_W // 2, ARENA_H // 3)]))
-
+            enemies.append(spawn_enemy(MiniBoss, [(world_w // 2, world_h // 3)]))
     load_room_level(None)
     running = True
     while running:
@@ -296,6 +299,10 @@ def main():
                 pygame.display.toggle_fullscreen()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
                 debug_collisions = not debug_collisions
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F2:
+                debug_collision_labels = not debug_collision_labels
+                if debug_collision_labels:
+                    debug_collisions = True
                 
             if game_state == "TITLE_SCREEN":
                 action = title_screen.handle_event(event)
@@ -490,6 +497,7 @@ def main():
         elif game_state == "TUTORIAL":
             tutorial_state.update(keys, WIDTH, HEIGHT)
         elif game_state == "COMBAT":
+            world_w, world_h = combat_world_size()
             # Disparar con flechas (soporta diagonales)
             dx, dy = 0, 0
             if keys[pygame.K_UP]: dy -= 1
@@ -504,22 +512,13 @@ def main():
             if pygame.mouse.get_pressed()[0]:
                 combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
                 
-            combat_player.move(keys, ARENA_W, ARENA_H, collision_manager)
-            combat_player.update_bullets(ARENA_W, ARENA_H)
+            combat_player.move(keys, world_w, world_h, collision_manager)
+            combat_player.update_bullets(world_w, world_h)
             
-            # Camera logic (smooth follow)
-            target_cam_x = WIDTH // 2 - combat_player.x
-            target_cam_y = HEIGHT // 2 - combat_player.y
-            
-            # Clamping camera to boundaries
-            target_cam_x = min(0, max(-(ARENA_W - WIDTH), target_cam_x))
-            target_cam_y = min(0, max(-(ARENA_H - HEIGHT), target_cam_y))
-            
-            combat_cam_x += (target_cam_x - combat_cam_x) * 0.1
-            combat_cam_y += (target_cam_y - combat_cam_y) * 0.1
+            update_combat_camera(smooth=True)
             
             for enemy in enemies:
-                enemy.update(combat_player.x, combat_player.y, ARENA_W, ARENA_H, collision_manager)
+                enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager)
                 
                 if isinstance(enemy, MiniBoss):
                     bestiary_menu.unlock("MINI BOSS (PARCIAL)")
@@ -580,8 +579,8 @@ def main():
                     current_wave += 1
                     wave_timer = 300 # Reset timer para la siguiente ola
                     
-                    # Spawn desde la puerta (ARENA_W*0.85, ARENA_H*0.22)
-                    door_x, door_y = int(ARENA_W * 0.85), int(ARENA_H * 0.22)
+                    # Spawn desde la puerta del nivel activo
+                    door_x, door_y = int(world_w * 0.85), int(world_h * 0.22)
                     enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
                     
                     for _ in range(random.randint(3, 5)):
@@ -716,7 +715,7 @@ def main():
                 screen.blit(msg2, msg2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50 - offset_y)))
                 
         elif game_state == "COMBAT" or (game_state == "PAUSE" and previous_state == "COMBAT"):
-            draw_floor(screen, current_room, combat_cam_x, combat_cam_y)
+            draw_floor(screen, combat_bg_img, combat_cam_x, combat_cam_y)
             combat_player.draw(screen, combat_cam_x, combat_cam_y)
             for e in enemies:
                 e.draw(screen, combat_cam_x, combat_cam_y)
@@ -730,14 +729,41 @@ def main():
                 screen.blit(dmg_surf, rect)
 
             if debug_collisions and collision_manager:
-                collision_manager.draw_debug(screen, camera=(combat_cam_x, combat_cam_y))
+                collision_manager.draw_debug(
+                    screen,
+                    camera=(combat_cam_x, combat_cam_y),
+                    font=font_sm,
+                    show_names=debug_collision_labels,
+                )
+                current_level.draw_hazard_debug(
+                    screen,
+                    camera=(combat_cam_x, combat_cam_y),
+                    font=font_sm,
+                    show_names=debug_collision_labels,
+                )
                 
-                # We need to offset the rect for debug drawing
                 p_rect = combat_player.rect.move(combat_cam_x, combat_cam_y)
-                pygame.draw.rect(screen, (0, 255, 255), p_rect, 1)
+                p_hit = combat_player.last_collision.get("x") or combat_player.last_collision.get("y")
+                pygame.draw.rect(screen, (255, 80, 80) if p_hit else (0, 255, 255), p_rect, 2)
                 for e in enemies:
                     e_rect = e.rect.move(combat_cam_x, combat_cam_y)
-                    pygame.draw.rect(screen, (255, 80, 180), e_rect, 1)
+                    e_hit = e.last_collision.get("x") or e.last_collision.get("y")
+                    pygame.draw.rect(screen, (255, 80, 80) if e_hit else (255, 80, 180), e_rect, 1)
+
+                if debug_collision_labels:
+                    debug_lines = [
+                        f"Nivel: {current_level.name}  Mundo: {current_level.width}x{current_level.height}",
+                        f"Jugador: {int(combat_player.x)}, {int(combat_player.y)}  Bloqueo: X={combat_player.last_collision.get('x')} Y={combat_player.last_collision.get('y')}",
+                        "F1: solidos/hazards | F2: nombres/ajuste",
+                    ]
+                    info_y = 68
+                    for line in debug_lines:
+                        text_surf = font_sm.render(line, True, (255, 255, 255))
+                        bg = pygame.Surface((text_surf.get_width() + 10, text_surf.get_height() + 6), pygame.SRCALPHA)
+                        bg.fill((0, 0, 0, 170))
+                        screen.blit(bg, (12, info_y))
+                        screen.blit(text_surf, (17, info_y + 3))
+                        info_y += text_surf.get_height() + 8
                 
             # UI de Combate - Panel superior
             hud_rect = pygame.Surface((WIDTH, 60))

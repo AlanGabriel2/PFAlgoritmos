@@ -1,0 +1,197 @@
+{
+    "name":  "s7",
+    "background":  "assets/images/backgrounds/s7.png",
+    "size":  [
+                 1672,
+                 941
+             ],
+    "coordinate_system":  "world coordinates in source background pixels",
+    "player_spawn":  [
+                         836,
+                         470
+                     ],
+    "enemy_spawns":  [
+                         [
+                             816,
+                             250
+                         ],
+                         [
+                             836,
+                             710
+                         ],
+                         [
+                             190,
+                             340
+                         ],
+                         [
+                             1510,
+                             320
+                         ],
+                         [
+                             720,
+                             620
+                         ],
+                         [
+                             980,
+                             620
+                         ]
+                     ],
+    "colliders":  [
+                      {
+                          "name":  "top_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  -64,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "bottom_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  941,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "left_boundary",
+                          "type":  "boundary",
+                          "x":  -64,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_boundary",
+                          "type":  "boundary",
+                          "x":  1672,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  1672,
+                          "h":  58
+                      },
+                      {
+                          "name":  "bottom_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  878,
+                          "w":  1672,
+                          "h":  63
+                      },
+                      {
+                          "name":  "left_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_wall",
+                          "type":  "wall",
+                          "x":  1616,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_left_robot_station",
+                          "type":  "workbench",
+                          "x":  250,
+                          "y":  145,
+                          "w":  305,
+                          "h":  150
+                      },
+                      {
+                          "name":  "top_right_large_robot",
+                          "type":  "robot",
+                          "x":  1110,
+                          "y":  105,
+                          "w":  350,
+                          "h":  260
+                      },
+                      {
+                          "name":  "mid_left_workbench",
+                          "type":  "workbench",
+                          "x":  245,
+                          "y":  405,
+                          "w":  365,
+                          "h":  170
+                      },
+                      {
+                          "name":  "mid_right_workbench",
+                          "type":  "workbench",
+                          "x":  1065,
+                          "y":  405,
+                          "w":  365,
+                          "h":  170
+                      },
+                      {
+                          "name":  "bottom_left_workbench",
+                          "type":  "workbench",
+                          "x":  250,
+                          "y":  665,
+                          "w":  360,
+                          "h":  150
+                      },
+                      {
+                          "name":  "bottom_right_robot_station",
+                          "type":  "robot",
+                          "x":  1085,
+                          "y":  635,
+                          "w":  370,
+                          "h":  175
+                      },
+                      {
+                          "name":  "top_crates",
+                          "type":  "crate",
+                          "x":  650,
+                          "y":  120,
+                          "w":  245,
+                          "h":  80
+                      },
+                      {
+                          "name":  "bottom_center_door",
+                          "type":  "door_block",
+                          "x":  720,
+                          "y":  815,
+                          "w":  240,
+                          "h":  110
+                      },
+                      {
+                          "name":  "right_wall_crates",
+                          "type":  "crate",
+                          "x":  1480,
+                          "y":  430,
+                          "w":  90,
+                          "h":  170
+                      },
+                      {
+                          "name":  "left_wall_crates",
+                          "type":  "crate",
+                          "x":  80,
+                          "y":  520,
+                          "w":  115,
+                          "h":  130
+                      }
+                  ],
+    "hazard_zones":  [
+
+                     ],
+    "triggers":  [
+
+                 ],
+    "interactables":  [
+
+                      ],
+    "doors":  [
+
+              ]
+}

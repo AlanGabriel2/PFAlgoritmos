@@ -84,34 +84,45 @@ class CollisionManager:
             else:
                 entity.rect.y += int(round(amount))
 
-        collided = False
-        for collider in self._enabled_colliders():
-            if not entity.rect.colliderect(collider):
-                continue
+        collisions = [collider for collider in self._enabled_colliders() if entity.rect.colliderect(collider)]
+        if not collisions:
+            return False
 
-            collided = True
-            if axis == "x":
-                if amount > 0:
-                    entity.rect.right = collider.left
-                else:
-                    entity.rect.left = collider.right
-                if hasattr(entity, "x"):
-                    entity.x = float(entity.rect.centerx)
+        if axis == "x":
+            if amount > 0:
+                entity.rect.right = min(collider.left for collider in collisions)
             else:
-                if amount > 0:
-                    entity.rect.bottom = collider.top
-                else:
-                    entity.rect.top = collider.bottom
-                if hasattr(entity, "y"):
-                    entity.y = float(entity.rect.centery)
+                entity.rect.left = max(collider.right for collider in collisions)
+            if hasattr(entity, "x"):
+                entity.x = float(entity.rect.centerx)
+        else:
+            if amount > 0:
+                entity.rect.bottom = min(collider.top for collider in collisions)
+            else:
+                entity.rect.top = max(collider.bottom for collider in collisions)
+            if hasattr(entity, "y"):
+                entity.y = float(entity.rect.centery)
 
-        return collided
+        return True
 
-    def draw_debug(self, surface, camera=None):
+    def draw_debug(self, surface, camera=None, font=None, show_names=False):
         offset_x, offset_y = self._camera_offset(camera)
-        for rect in self._enabled_colliders():
+        for rect, data in zip(self.colliders, self.metadata):
+            if not data.get("enabled", True):
+                continue
             debug_rect = rect.move(offset_x, offset_y)
-            pygame.draw.rect(surface, (255, 220, 40), debug_rect, 2)
+            pygame.draw.rect(surface, (255, 70, 70), debug_rect, 2)
+            if show_names and font:
+                name = str(data.get("name", "collider"))
+                text = font.render(name, True, (255, 190, 190))
+                bg = pygame.Surface((text.get_width() + 6, text.get_height() + 4), pygame.SRCALPHA)
+                bg.fill((0, 0, 0, 155))
+                label_x = debug_rect.x
+                label_y = debug_rect.y - text.get_height() - 4
+                if label_y < 0:
+                    label_y = debug_rect.y + 2
+                surface.blit(bg, (label_x, label_y))
+                surface.blit(text, (label_x + 3, label_y + 2))
 
     def _camera_offset(self, camera):
         if camera is None:

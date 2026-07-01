@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -10,6 +11,39 @@ from collision_manager import CollisionManager
 BASE_DIR = Path(__file__).resolve().parent
 LEVELS_DIR = BASE_DIR / "levels"
 DEFAULT_COMBAT_LEVEL = "combat_default"
+BACKGROUND_DIR = BASE_DIR / "assets" / "images" / "backgrounds"
+
+
+def resolve_asset_path(path_value):
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return BASE_DIR / path
+
+
+def get_image_size(path_value, fallback_size=(1024, 768)):
+    try:
+        image = pygame.image.load(str(resolve_asset_path(path_value)))
+        return image.get_size()
+    except Exception:
+        return tuple(fallback_size)
+
+
+def level_key_from_room_id(room_id):
+    if not room_id:
+        return None
+    if isinstance(room_id, int):
+        return f"s{room_id}"
+
+    text = str(room_id)
+    direct = text.lower()
+    if re.fullmatch(r"s\d+", direct):
+        return direct
+
+    match = re.search(r"TIP(\d{2})", text.upper())
+    if match:
+        return f"s{int(match.group(1))}"
+    return None
 
 
 @dataclass
@@ -20,13 +54,19 @@ class Level:
     player_spawn: tuple
     colliders: list = field(default_factory=list)
     collider_metadata: list = field(default_factory=list)
+    hazard_zones: list = field(default_factory=list)
+    hazard_metadata: list = field(default_factory=list)
     triggers: list = field(default_factory=list)
     enemy_spawns: list = field(default_factory=list)
     interactables: list = field(default_factory=list)
     doors: list = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data, fallback_size=(1024, 768)):
+        background = data.get("background", "")
+        size = tuple(data.get("size") or get_image_size(background, fallback_size))
+        player_spawn = tuple(data.get("player_spawn", (size[0] // 2, size[1] // 2)))
+
         colliders = []
         collider_metadata = []
         for index, item in enumerate(data.get("colliders", [])):
@@ -40,21 +80,72 @@ class Level:
                 }
             )
 
+        hazard_zones = []
+        hazard_metadata = []
+        for index, item in enumerate(data.get("hazard_zones", [])):
+            rect = pygame.Rect(item["x"], item["y"], item["w"], item["h"])
+            hazard_zones.append(rect)
+            hazard_metadata.append(
+                {
+                    "name": item.get("name", f"hazard_{index}"),
+                    "type": item.get("type", "hazard"),
+                    "enabled": item.get("enabled", True),
+                    "damage": item.get("damage", 0),
+                }
+            )
+
         return cls(
             name=data.get("name", "unnamed_level"),
-            background=data.get("background", ""),
-            size=tuple(data.get("size", (1024, 768))),
-            player_spawn=tuple(data.get("player_spawn", (512, 384))),
+            background=background,
+            size=size,
+            player_spawn=player_spawn,
             colliders=colliders,
             collider_metadata=collider_metadata,
+            hazard_zones=hazard_zones,
+            hazard_metadata=hazard_metadata,
             triggers=data.get("triggers", []),
             enemy_spawns=[tuple(spawn) for spawn in data.get("enemy_spawns", [])],
             interactables=data.get("interactables", []),
             doors=data.get("doors", []),
         )
 
+    @property
+    def width(self):
+        return int(self.size[0])
+
+    @property
+    def height(self):
+        return int(self.size[1])
+
+    @property
+    def rect(self):
+        return pygame.Rect(0, 0, self.width, self.height)
+
     def create_collision_manager(self):
         return CollisionManager(self.colliders, self.collider_metadata)
+
+    def draw_hazard_debug(self, surface, camera=None, font=None, show_names=False):
+        offset_x, offset_y = 0, 0
+        if isinstance(camera, (tuple, list)) and len(camera) >= 2:
+            offset_x, offset_y = int(camera[0]), int(camera[1])
+        for rect, data in zip(self.hazard_zones, self.hazard_metadata):
+            if not data.get("enabled", True):
+                continue
+            debug_rect = rect.move(offset_x, offset_y)
+            pygame.draw.rect(surface, (255, 60, 220), debug_rect, 2)
+            if show_names and font:
+                text = font.render(str(data.get("name", "hazard")), True, (255, 180, 255))
+                surface.blit(text, (debug_rect.x + 3, debug_rect.y + 3))
+
+    def load_background(self):
+        if not self.background:
+            return None
+        image = pygame.image.load(str(resolve_asset_path(self.background)))
+        if pygame.display.get_init() and pygame.display.get_surface():
+            image = image.convert()
+        if image.get_size() != tuple(self.size):
+            image = pygame.transform.scale(image, tuple(self.size))
+        return image
 
 
 def resolve_level_path(level_name_or_path):
@@ -74,22 +165,30 @@ def load_level(level_name_or_path, fallback_size=(1024, 768)):
         return build_default_combat_level(fallback_size)
 
     with path.open("r", encoding="utf-8") as f:
-        return Level.from_dict(json.load(f))
+        return Level.from_dict(json.load(f), fallback_size=fallback_size)
 
 
 def load_combat_level(room_id=None, fallback_size=(1024, 768)):
+    candidates = []
     if room_id:
-        room_path = resolve_level_path(room_id)
-        if room_path.exists():
-            return load_level(room_path, fallback_size)
-    return load_level(DEFAULT_COMBAT_LEVEL, fallback_size)
+        candidates.append(room_id)
+        semester_key = level_key_from_room_id(room_id)
+        if semester_key:
+            candidates.append(semester_key)
+    candidates.append(DEFAULT_COMBAT_LEVEL)
+
+    for candidate in candidates:
+        path = resolve_level_path(candidate)
+        if path.exists():
+            return load_level(path, fallback_size)
+    return build_default_combat_level(fallback_size)
 
 
 def build_default_combat_level(size=(1024, 768)):
     width, height = size
     data = {
         "name": DEFAULT_COMBAT_LEVEL,
-        "background": "assets/floor_tile.png",
+        "background": "assets/images/backgrounds/floor_tile.png",
         "size": [width, height],
         "player_spawn": [width // 2, height // 2],
         "enemy_spawns": [
@@ -104,6 +203,7 @@ def build_default_combat_level(size=(1024, 768)):
             {"name": "left_boundary", "type": "boundary", "x": -32, "y": 0, "w": 32, "h": height},
             {"name": "right_boundary", "type": "boundary", "x": width, "y": 0, "w": 32, "h": height},
         ],
+        "hazard_zones": [],
         "triggers": [],
     }
-    return Level.from_dict(data)
+    return Level.from_dict(data, fallback_size=size)

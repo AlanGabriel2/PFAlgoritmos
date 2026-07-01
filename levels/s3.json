@@ -1,0 +1,205 @@
+{
+    "name":  "s3",
+    "background":  "assets/images/backgrounds/s3.png",
+    "size":  [
+                 1672,
+                 941
+             ],
+    "coordinate_system":  "world coordinates in source background pixels",
+    "player_spawn":  [
+                         836,
+                         455
+                     ],
+    "enemy_spawns":  [
+                         [
+                             836,
+                             310
+                         ],
+                         [
+                             816,
+                             800
+                         ],
+                         [
+                             180,
+                             350
+                         ],
+                         [
+                             1490,
+                             350
+                         ],
+                         [
+                             560,
+                             665
+                         ],
+                         [
+                             1100,
+                             665
+                         ]
+                     ],
+    "colliders":  [
+                      {
+                          "name":  "top_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  -64,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "bottom_boundary",
+                          "type":  "boundary",
+                          "x":  0,
+                          "y":  941,
+                          "w":  1672,
+                          "h":  64
+                      },
+                      {
+                          "name":  "left_boundary",
+                          "type":  "boundary",
+                          "x":  -64,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_boundary",
+                          "type":  "boundary",
+                          "x":  1672,
+                          "y":  0,
+                          "w":  64,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  1672,
+                          "h":  58
+                      },
+                      {
+                          "name":  "bottom_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  878,
+                          "w":  1672,
+                          "h":  63
+                      },
+                      {
+                          "name":  "left_wall",
+                          "type":  "wall",
+                          "x":  0,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "right_wall",
+                          "type":  "wall",
+                          "x":  1616,
+                          "y":  0,
+                          "w":  56,
+                          "h":  941
+                      },
+                      {
+                          "name":  "top_left_blue_pipe",
+                          "type":  "pipe",
+                          "x":  95,
+                          "y":  70,
+                          "w":  410,
+                          "h":  95
+                      },
+                      {
+                          "name":  "top_center_gears",
+                          "type":  "machine",
+                          "x":  680,
+                          "y":  70,
+                          "w":  300,
+                          "h":  145
+                      },
+                      {
+                          "name":  "top_right_red_pipe",
+                          "type":  "pipe",
+                          "x":  1110,
+                          "y":  70,
+                          "w":  430,
+                          "h":  100
+                      },
+                      {
+                          "name":  "left_power_station",
+                          "type":  "machine",
+                          "x":  245,
+                          "y":  215,
+                          "w":  215,
+                          "h":  125
+                      },
+                      {
+                          "name":  "right_power_station",
+                          "type":  "machine",
+                          "x":  1200,
+                          "y":  210,
+                          "w":  220,
+                          "h":  130
+                      },
+                      {
+                          "name":  "left_workbench",
+                          "type":  "machine",
+                          "x":  125,
+                          "y":  455,
+                          "w":  380,
+                          "h":  105
+                      },
+                      {
+                          "name":  "right_workbench",
+                          "type":  "machine",
+                          "x":  1160,
+                          "y":  455,
+                          "w":  380,
+                          "h":  105
+                      },
+                      {
+                          "name":  "left_generator",
+                          "type":  "machine",
+                          "x":  230,
+                          "y":  635,
+                          "w":  205,
+                          "h":  150
+                      },
+                      {
+                          "name":  "center_lower_pump",
+                          "type":  "machine",
+                          "x":  705,
+                          "y":  585,
+                          "w":  150,
+                          "h":  175
+                      },
+                      {
+                          "name":  "right_generator",
+                          "type":  "machine",
+                          "x":  1230,
+                          "y":  635,
+                          "w":  220,
+                          "h":  155
+                      },
+                      {
+                          "name":  "bottom_center_steps",
+                          "type":  "stairs_block",
+                          "x":  690,
+                          "y":  850,
+                          "w":  300,
+                          "h":  70
+                      }
+                  ],
+    "hazard_zones":  [
+
+                     ],
+    "triggers":  [
+
+                 ],
+    "interactables":  [
+
+                      ],
+    "doors":  [
+
+              ]
+}

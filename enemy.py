@@ -55,6 +55,7 @@ class Enemy:
         self.radius = radius
         self.rect = pygame.Rect(0, 0, radius * 2, radius * 2)
         self.sync_rect_to_position()
+        self.last_collision = {"x": False, "y": False}
         self.speed = speed
         self.hp = hp
         self.max_hp = hp
@@ -83,9 +84,10 @@ class Enemy:
         if collision_manager:
             self.x, self.y = old_x, old_y
             self.sync_rect_to_position()
-            collision_manager.move_and_collide(self, dx, dy)
+            self.last_collision = collision_manager.move_and_collide(self, dx, dy)
         else:
             self.sync_rect_to_position()
+            self.last_collision = {"x": False, "y": False}
         
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
