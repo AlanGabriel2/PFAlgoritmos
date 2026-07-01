@@ -50,11 +50,13 @@ class EnemyBullet:
         return self.x < 0 or self.x > w or self.y < 0 or self.y > h
 
 class Enemy:
-    def __init__(self, x, y, radius, speed, hp, sheet_path, frame_width, frame_height=None, cols=4, rows=3, scale=1.0):
+    def __init__(self, x, y, radius, speed, hp, sheet_path, frame_width, frame_height=None, cols=4, rows=3, scale=1.0, collision_scale=1.0):
         self.x = x
         self.y = y
         self.radius = radius * scale
-        self.rect = pygame.Rect(0, 0, self.radius * 2, self.radius * 2)
+        self.collision_scale = collision_scale
+        collision_size = max(8, int(round(self.radius * 2 * collision_scale)))
+        self.rect = pygame.Rect(0, 0, collision_size, collision_size)
         self.sync_rect_to_position()
         self.last_collision = {"x": False, "y": False}
         self.speed = speed
@@ -203,12 +205,12 @@ class Enemy:
 class BugEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
         # Tamaño escalado un poco más pequeño
-        super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet.png", 54, cols=6, scale=scale)
+        super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet.png", 54, cols=6, scale=scale, collision_scale=0.82)
         self.ai_smartness = 0.9
         self.animator.animation_speed = 0.08
 class SpaghettiEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 72, scale=scale)
+        super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 72, scale=scale, collision_scale=0.70)
         self.ai_smartness = 0.55
         self.separation_weight = 0.45
     def move_logic(self, player_x, player_y):
@@ -220,12 +222,12 @@ class SpaghettiEnemy(Enemy):
 
 class MemoryLeakEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet.png", 48, scale=scale)
+        super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet.png", 48, scale=scale, collision_scale=0.82)
         self.ai_smartness = 0.95
 
 class DeadlineEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet.png", 96, scale=scale)
+        super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet.png", 96, scale=scale, collision_scale=0.56)
         self.ai_smartness = 0.85
     def move_logic(self, player_x, player_y):
         dist = math.hypot(player_x - self.x, player_y - self.y)
@@ -274,11 +276,45 @@ class MiniBoss(Enemy):
         self.jump_debug_start = self.jump_start
         self.jump_debug_target = self.jump_target
         self.jump_player_reference = (self.x, self.y)
+        self.area_attack_radius = max(80, int(120 * scale))
+        self.area_attack_damage = 18
+        self.area_attack_charge_duration = 45
+        self.area_attack_flight_duration = 46
+        self.area_attack_explosion_duration = 26
+        self.area_attack_cooldown_duration = 210
+        self.area_attack_cooldown = 0
+        self.area_attack_charge_timer = 0
+        self.area_attack_target = None
+        self.area_attack_reason = "idle"
+        self.area_attack_salvo_count = 3
+        self.area_attack_salvo_delay = 28
+        self.area_attack_round_count = 2
+        self.area_attack_round_delay = 105
+        self.area_attack_rounds_remaining = 0
+        self.area_attack_next_round_timer = 0
+        self.area_attack_latest_player = (self.x, self.y)
+        self.area_fire_duration = 240
+        self.area_fire_tick_interval = 30
+        self.area_fire_damage = 5
+        self.area_missiles = []
+        self.area_explosions = []
+        self.area_fires = []
+        self.area_damage_events = []
         self.color = (255, 90, 40)
 
     def update_special_movement(self, player_x, player_y, width, height, collision_manager=None, pathfinder=None):
+        self.update_area_attacks(width, height, player_x, player_y)
         if self.jump_cooldown > 0:
             self.jump_cooldown -= 1
+        if self.area_attack_cooldown > 0:
+            self.area_attack_cooldown -= 1
+
+        if self.area_attack_charge_timer > 0 or self.area_attack_next_round_timer > 0:
+            self.navigator.clear_path()
+            self.navigator.mode = "bombard_charge" if self.area_attack_charge_timer > 0 else "bombard_reload"
+            self.state = 2
+            return True
+
         if self.jump_timer <= 0:
             return False
 
@@ -309,7 +345,7 @@ class MiniBoss(Enemy):
         return True
 
     def after_navigation_update(self, player_x, player_y, width, height, pathfinder=None):
-        if self.jump_timer > 0 or self.jump_cooldown > 0:
+        if self.jump_timer > 0 or self.jump_cooldown > 0 or self.area_attack_charge_timer > 0:
             return
 
         collided = self.last_collision.get("x") or self.last_collision.get("y")
@@ -328,14 +364,22 @@ class MiniBoss(Enemy):
         target, was_valid, used_fallback, reason = self.choose_jump_target(player_x, player_y, width, height, pathfinder)
         if target is None:
             return False
-        self.jump_start = (self.x, self.y)
-        self.jump_target = target
-        self.jump_debug_start = self.jump_start
-        self.jump_debug_target = self.jump_target
+        self.jump_debug_start = (self.x, self.y)
+        self.jump_debug_target = target
         self.jump_player_reference = (player_x, player_y)
         self.jump_landing_valid = was_valid
         self.jump_landing_fallback = used_fallback
         self.jump_landing_reason = reason
+
+        if not was_valid:
+            if self.start_area_attack(player_x, player_y, width, height, reason):
+                return True
+            self.jump_blocked_frames = 0
+            self.navigator.mode = "holding_pressure"
+            return False
+
+        self.jump_start = (self.x, self.y)
+        self.jump_target = target
         self.jump_timer = self.jump_duration
         self.jump_blocked_frames = 0
         self.navigator.clear_path()
@@ -480,6 +524,368 @@ class MiniBoss(Enemy):
         self.jump_landing_fallback = True
         self.jump_landing_reason = best_reason
         self.jump_landing_candidates = repair_debug
+
+    def start_area_attack(self, player_x, player_y, width, height, reason="inaccessible"):
+        if self.area_attack_cooldown > 0 or self.area_attack_charge_timer > 0:
+            return False
+
+        self.area_attack_target = self.clamp_area_attack_target((player_x, player_y), width, height)
+        self.area_attack_latest_player = self.area_attack_target
+        self.area_attack_reason = reason
+        self.area_attack_charge_timer = self.area_attack_charge_duration
+        self.area_attack_rounds_remaining = self.area_attack_round_count
+        self.area_attack_next_round_timer = 0
+        attack_duration = (
+            self.area_attack_charge_duration
+            + self.area_attack_round_delay * max(0, self.area_attack_round_count - 1)
+            + self.area_attack_flight_duration
+            + self.area_attack_salvo_delay * max(0, self.area_attack_salvo_count - 1)
+        )
+        self.area_attack_cooldown = max(self.area_attack_cooldown_duration, attack_duration + 45)
+        self.jump_blocked_frames = 0
+        self.jump_cooldown = max(self.jump_cooldown, 45)
+        self.navigator.clear_path()
+        self.navigator.mode = "bombard_charge"
+        self.state = 2
+        return True
+
+    def clamp_area_attack_target(self, target, width, height):
+        margin = max(8, int(self.area_attack_radius * 0.25))
+        x = max(margin, min(width - margin, target[0]))
+        y = max(margin, min(height - margin, target[1]))
+        return float(x), float(y)
+
+    def update_area_attacks(self, width, height, player_x=None, player_y=None):
+        if player_x is not None and player_y is not None:
+            self.area_attack_latest_player = self.clamp_area_attack_target((player_x, player_y), width, height)
+
+        if self.area_attack_charge_timer > 0:
+            self.area_attack_charge_timer -= 1
+            if self.area_attack_charge_timer <= 0:
+                target = self.area_attack_target or self.area_attack_latest_player
+                self.launch_area_missiles(width, height, target, round_index=0)
+                self.area_attack_target = None
+                self.area_attack_rounds_remaining = max(0, self.area_attack_rounds_remaining - 1)
+                if self.area_attack_rounds_remaining > 0:
+                    self.area_attack_next_round_timer = self.area_attack_round_delay
+
+        if self.area_attack_next_round_timer > 0:
+            self.area_attack_next_round_timer -= 1
+            if self.area_attack_next_round_timer <= 0 and self.area_attack_rounds_remaining > 0:
+                round_index = self.area_attack_round_count - self.area_attack_rounds_remaining
+                self.launch_area_missiles(width, height, self.area_attack_latest_player, round_index=round_index)
+                self.area_attack_rounds_remaining -= 1
+                if self.area_attack_rounds_remaining > 0:
+                    self.area_attack_next_round_timer = self.area_attack_round_delay
+
+        for missile in self.area_missiles[:]:
+            missile["timer"] -= 1
+            if missile["timer"] <= 0:
+                self.area_missiles.remove(missile)
+                target = missile["target"]
+                damage_center = missile.get("damage_center", target)
+                self.area_explosions.append(
+                    {
+                        "x": target[0],
+                        "y": target[1],
+                        "radius": missile["radius"],
+                        "timer": self.area_attack_explosion_duration,
+                        "duration": self.area_attack_explosion_duration,
+                    }
+                )
+                self.area_damage_events.append(
+                    {
+                        "kind": "impact",
+                        "x": damage_center[0],
+                        "y": damage_center[1],
+                        "radius": missile["radius"],
+                        "damage": missile["damage"],
+                    }
+                )
+                self.create_fire_zone(damage_center, missile["radius"])
+
+        for explosion in self.area_explosions[:]:
+            explosion["timer"] -= 1
+            if explosion["timer"] <= 0:
+                self.area_explosions.remove(explosion)
+
+        for fire in self.area_fires[:]:
+            fire["timer"] -= 1
+            fire["tick_timer"] -= 1
+            if fire["timer"] <= 0:
+                self.area_fires.remove(fire)
+
+    def launch_area_missiles(self, width, height, target_center=None, round_index=0):
+        if target_center is None:
+            if self.area_attack_target is None:
+                return
+            target_center = self.area_attack_target
+
+        center = self.clamp_area_attack_target(target_center, width, height)
+        targets = self.build_area_salvo_targets(center, width, height, round_index)
+        dx = center[0] - self.x
+        dy = center[1] - self.y
+        distance = max(1.0, math.hypot(dx, dy))
+        side_x, side_y = -dy / distance, dx / distance
+
+        for index, target_center in enumerate(targets):
+            side = -1 if (index + round_index) % 2 == 0 else 1
+            start = (
+                self.x + side_x * side * self.radius * 0.45,
+                self.y + side_y * side * self.radius * 0.45 - self.radius * 0.2,
+            )
+            target = (
+                target_center[0] + side_x * side * self.area_attack_radius * 0.12,
+                target_center[1] + side_y * side * self.area_attack_radius * 0.12,
+            )
+            duration = self.area_attack_flight_duration + index * self.area_attack_salvo_delay
+            self.area_missiles.append(
+                {
+                    "start": start,
+                    "target": target,
+                    "damage_center": target_center,
+                    "radius": self.area_attack_radius,
+                    "damage": self.area_attack_damage,
+                    "timer": duration,
+                    "duration": duration,
+                    "salvo_index": index,
+                    "round_index": round_index,
+                }
+            )
+
+        self.navigator.mode = "bombard_launch"
+
+    def build_area_salvo_targets(self, center, width, height, round_index=0):
+        dx = center[0] - self.x
+        dy = center[1] - self.y
+        distance = max(1.0, math.hypot(dx, dy))
+        forward_x, forward_y = dx / distance, dy / distance
+        side_x, side_y = -forward_y, forward_x
+        if round_index % 2 == 1:
+            side_x, side_y = -side_x, -side_y
+        spread = self.area_attack_radius * 0.55
+        forward_spread = self.area_attack_radius * 0.25
+        raw_targets = [center]
+        raw_targets.append((center[0] + side_x * spread + forward_x * forward_spread, center[1] + side_y * spread + forward_y * forward_spread))
+        raw_targets.append((center[0] - side_x * spread - forward_x * forward_spread, center[1] - side_y * spread - forward_y * forward_spread))
+        return [self.clamp_area_attack_target(target, width, height) for target in raw_targets[: self.area_attack_salvo_count]]
+
+    def create_fire_zone(self, center, radius):
+        self.area_fires.append(
+            {
+                "x": center[0],
+                "y": center[1],
+                "radius": radius * 0.78,
+                "timer": self.area_fire_duration,
+                "duration": self.area_fire_duration,
+                "tick_timer": self.area_fire_tick_interval,
+                "tick_interval": self.area_fire_tick_interval,
+                "damage": self.area_fire_damage,
+            }
+        )
+
+    def collect_area_damage_events(self, player):
+        hits = []
+        for event in self.area_damage_events[:]:
+            self.area_damage_events.remove(event)
+            distance = math.hypot(player.x - event["x"], player.y - event["y"])
+            if distance <= event["radius"] + player.radius * 0.35:
+                hits.append({"damage": event["damage"], "x": player.x, "y": player.y, "kind": event.get("kind", "impact")})
+
+        for fire in self.area_fires:
+            if fire["tick_timer"] > 0:
+                continue
+            distance = math.hypot(player.x - fire["x"], player.y - fire["y"])
+            if distance <= fire["radius"] + player.radius * 0.25:
+                hits.append({"damage": fire["damage"], "x": player.x, "y": player.y, "kind": "fire"})
+                fire["tick_timer"] = fire["tick_interval"]
+        return hits
+
+    def draw(self, surface, offset_x=0, offset_y=0):
+        self.draw_artillery_charge(surface, offset_x, offset_y)
+        super().draw(surface, offset_x, offset_y)
+        self.draw_area_projectiles(surface, offset_x, offset_y)
+
+    def draw_area_ground_effects(self, surface, offset_x=0, offset_y=0):
+        self.draw_area_warnings(surface, offset_x, offset_y)
+        for explosion in self.area_explosions:
+            self.draw_area_explosion(surface, explosion, offset_x, offset_y)
+
+    def draw_area_warnings(self, surface, offset_x=0, offset_y=0):
+        for fire in self.area_fires:
+            self.draw_fire_zone(surface, fire, offset_x, offset_y)
+
+        if self.area_attack_target is not None:
+            progress = 1.0 - (self.area_attack_charge_timer / max(1, self.area_attack_charge_duration))
+            self.draw_ground_warning(surface, self.area_attack_target, self.area_attack_radius, progress, offset_x, offset_y)
+
+        if self.area_attack_next_round_timer > 0 and self.area_attack_rounds_remaining > 0:
+            progress = 1.0 - (self.area_attack_next_round_timer / max(1, self.area_attack_round_delay))
+            self.draw_ground_warning(surface, self.area_attack_latest_player, self.area_attack_radius, progress, offset_x, offset_y)
+
+        for missile in self.area_missiles:
+            progress = 1.0 - (missile["timer"] / max(1, missile["duration"]))
+            self.draw_ground_warning(surface, missile.get("damage_center", missile["target"]), missile["radius"], progress, offset_x, offset_y)
+
+    def draw_pixel_disc(self, surface, center, radius, color, pixel_size=6, ring=False, ring_width=2, checker=False):
+        radius = int(radius)
+        pixel_size = max(2, int(pixel_size))
+        cx, cy = int(center[0]), int(center[1])
+        outer = radius * radius
+        inner_radius = max(0, radius - pixel_size * ring_width)
+        inner = inner_radius * inner_radius
+        phase = (pygame.time.get_ticks() // 120) % 4
+
+        for y in range(-radius, radius + pixel_size, pixel_size):
+            for x in range(-radius, radius + pixel_size, pixel_size):
+                distance = x * x + y * y
+                if distance > outer:
+                    continue
+                if ring and distance < inner:
+                    continue
+                if checker and ((x // pixel_size + y // pixel_size + phase) % 5 == 0):
+                    continue
+                pygame.draw.rect(surface, color, (cx + x, cy + y, pixel_size, pixel_size))
+
+    def draw_ground_warning(self, surface, center, radius, progress, offset_x=0, offset_y=0):
+        pixel = 6
+        radius = int(radius)
+        size = int(radius * 2 + pixel * 5)
+        warning = pygame.Surface((size, size), pygame.SRCALPHA)
+        local = (size // 2, size // 2)
+        progress = max(0.0, min(1.0, progress))
+        fill_alpha = int(32 + 44 * progress)
+        ring_alpha = int(130 + 90 * abs(math.sin(pygame.time.get_ticks() / 90.0)))
+
+        self.draw_pixel_disc(warning, local, radius, (255, 55, 35, fill_alpha), pixel_size=pixel, checker=True)
+        self.draw_pixel_disc(warning, local, radius, (255, 210, 80, ring_alpha), pixel_size=pixel, ring=True, ring_width=2)
+        inner_radius = max(8, int(radius * (1.0 - progress * 0.72)))
+        self.draw_pixel_disc(warning, local, inner_radius, (255, 70, 45, 190), pixel_size=5, ring=True, ring_width=1)
+
+        mark = max(8, int(radius * 0.18))
+        pygame.draw.rect(warning, (255, 230, 120, 160), (local[0] - 3, local[1] - radius, 6, mark))
+        pygame.draw.rect(warning, (255, 230, 120, 160), (local[0] - 3, local[1] + radius - mark, 6, mark))
+        pygame.draw.rect(warning, (255, 230, 120, 160), (local[0] - radius, local[1] - 3, mark, 6))
+        pygame.draw.rect(warning, (255, 230, 120, 160), (local[0] + radius - mark, local[1] - 3, mark, 6))
+
+        x = int(center[0] + offset_x - size / 2)
+        y = int(center[1] + offset_y - size / 2)
+        surface.blit(warning, (x, y))
+
+    def draw_fire_zone(self, surface, fire, offset_x=0, offset_y=0):
+        radius = int(fire["radius"])
+        pixel = 6
+        size = int(radius * 2 + pixel * 5)
+        fire_surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        local = (size // 2, size // 2)
+        life = max(0.0, min(1.0, fire["timer"] / max(1, fire["duration"])))
+        pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() / 95.0)
+
+        self.draw_pixel_disc(fire_surf, local, radius, (165, 35, 16, int(70 * life + pulse * 28)), pixel_size=pixel, checker=True)
+        self.draw_pixel_disc(fire_surf, local, radius * 0.72, (255, 82, 24, int(82 + pulse * 44)), pixel_size=pixel, checker=True)
+        self.draw_pixel_disc(fire_surf, local, radius * 0.42, (255, 174, 44, int(70 + pulse * 60)), pixel_size=5, checker=True)
+        self.draw_pixel_disc(fire_surf, local, radius, (95, 20, 10, int(95 * life)), pixel_size=pixel, ring=True, ring_width=1)
+
+        ember_count = 12
+        for index in range(ember_count):
+            angle = (math.tau / ember_count) * index + pygame.time.get_ticks() / 650.0
+            ember_radius = radius * (0.18 + 0.72 * ((index * 37) % 100) / 100.0)
+            ember_x = local[0] + math.cos(angle) * ember_radius
+            ember_y = local[1] + math.sin(angle * 1.35) * ember_radius * 0.72
+            ember_size = 3 + (index % 2) * 2
+            pygame.draw.rect(fire_surf, (255, 220, 80, int(90 * life)), (int(ember_x), int(ember_y), ember_size, ember_size))
+
+        surface.blit(fire_surf, (int(fire["x"] + offset_x - size / 2), int(fire["y"] + offset_y - size / 2)))
+
+    def draw_artillery_charge(self, surface, offset_x=0, offset_y=0):
+        if self.area_attack_charge_timer <= 0:
+            return
+        progress = 1.0 - (self.area_attack_charge_timer / max(1, self.area_attack_charge_duration))
+        pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() / 80.0)
+        radius = int(self.radius * (0.85 + progress * 0.55 + pulse * 0.12))
+        glow = pygame.Surface((radius * 2 + 18, radius * 2 + 18), pygame.SRCALPHA)
+        center = (glow.get_width() // 2, glow.get_height() // 2)
+        self.draw_pixel_disc(glow, center, radius, (255, 95, 30, int(48 + progress * 82)), pixel_size=7, checker=True)
+        self.draw_pixel_disc(glow, center, max(8, int(radius * 0.62)), (255, 230, 90, int(105 + pulse * 90)), pixel_size=6, ring=True, ring_width=1)
+        surface.blit(glow, (int(self.x + offset_x - center[0]), int(self.y + offset_y - center[1])))
+
+        for side in (-1, 1):
+            launcher_x = int(self.x + offset_x + side * self.radius * 0.45)
+            launcher_y = int(self.y + offset_y - self.radius * 0.2)
+            pygame.draw.rect(surface, (95, 58, 36), (launcher_x - 9, launcher_y - 7, 18, 14))
+            pygame.draw.rect(surface, (255, 175, 60), (launcher_x - 6, launcher_y - 4, 12, 8))
+            pygame.draw.rect(surface, (255, 255, 180), (launcher_x - 3, launcher_y - 2, 6, 4))
+
+    def draw_area_projectiles(self, surface, offset_x=0, offset_y=0):
+        for missile in self.area_missiles:
+            self.draw_rocket(surface, missile, offset_x, offset_y)
+
+    def missile_position(self, missile):
+        progress = 1.0 - (missile["timer"] / max(1, missile["duration"]))
+        progress = max(0.0, min(1.0, progress))
+        sx, sy = missile["start"]
+        tx, ty = missile["target"]
+        x = sx + (tx - sx) * progress
+        y = sy + (ty - sy) * progress
+        lift = math.sin(progress * math.pi) * max(80, missile["radius"] * 1.05)
+        return x, y - lift, progress
+
+    def draw_rocket(self, surface, missile, offset_x=0, offset_y=0):
+        x, y, progress = self.missile_position(missile)
+        sx, sy = missile["start"]
+        tx, ty = missile["target"]
+        angle = math.atan2(ty - sy, tx - sx)
+        cos_a = math.cos(angle)
+        sin_a = math.sin(angle)
+        side_x, side_y = -sin_a, cos_a
+        origin_x = x + offset_x
+        origin_y = y + offset_y
+
+        def block(local_forward, local_side, w, h, color):
+            center_x = origin_x + cos_a * local_forward + side_x * local_side
+            center_y = origin_y + sin_a * local_forward + side_y * local_side
+            pygame.draw.rect(surface, color, (int(center_x - w / 2), int(center_y - h / 2), int(w), int(h)))
+
+        block(10, 0, 8, 8, (230, 45, 36))
+        block(3, 0, 12, 8, (255, 207, 95))
+        block(-5, 0, 12, 10, (190, 38, 34))
+        block(-8, 7, 7, 6, (120, 32, 38))
+        block(-8, -7, 7, 6, (120, 32, 38))
+        block(-15, 0, 10, 8, (255, 120, 34))
+        block(-20, 0, 7, 6, (255, 226, 88))
+
+        trail_steps = 5
+        for step in range(1, trail_steps + 1):
+            t = max(0.0, progress - step * 0.045)
+            trail_x = sx + (tx - sx) * t
+            trail_y = sy + (ty - sy) * t - math.sin(t * math.pi) * max(80, missile["radius"] * 1.05)
+            size = max(3, 10 - step * 2)
+            pygame.draw.rect(
+                surface,
+                (255, max(70, 150 - step * 16), 38),
+                (int(trail_x + offset_x - size / 2), int(trail_y + offset_y - size / 2), size, size),
+            )
+
+    def draw_area_explosion(self, surface, explosion, offset_x=0, offset_y=0):
+        progress = 1.0 - (explosion["timer"] / max(1, explosion["duration"]))
+        radius = int(explosion["radius"] * (0.35 + progress * 0.85))
+        pixel = 7
+        size = int(explosion["radius"] * 2.5 + pixel * 4)
+        boom = pygame.Surface((size, size), pygame.SRCALPHA)
+        center = (size // 2, size // 2)
+        alpha = max(0, int(210 * (1.0 - progress)))
+        self.draw_pixel_disc(boom, center, radius, (255, 175, 42, alpha), pixel_size=pixel, checker=True)
+        self.draw_pixel_disc(boom, center, max(8, int(radius * 0.72)), (255, 68, 32, max(0, alpha - 26)), pixel_size=pixel, ring=True, ring_width=1)
+        self.draw_pixel_disc(boom, center, max(6, int(radius * 0.34)), (255, 236, 112, max(0, alpha - 12)), pixel_size=5, checker=True)
+        shard_count = 10
+        for index in range(shard_count):
+            angle = (math.tau / shard_count) * index + progress * 1.4
+            shard_distance = radius * (0.35 + progress * 0.55)
+            shard_size = max(3, int(8 * (1.0 - progress)))
+            shard_x = center[0] + math.cos(angle) * shard_distance
+            shard_y = center[1] + math.sin(angle) * shard_distance
+            pygame.draw.rect(boom, (255, 102, 34, max(0, alpha - 30)), (int(shard_x), int(shard_y), shard_size, shard_size))
+        surface.blit(boom, (int(explosion["x"] + offset_x - size / 2), int(explosion["y"] + offset_y - size / 2)))
 
     def get_visual_y_offset(self):
         if self.jump_timer <= 0:

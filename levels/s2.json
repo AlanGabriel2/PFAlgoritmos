@@ -191,10 +191,10 @@
             "enabled": true
         },
         {
-            "x": 185,
-            "y": 707,
-            "w": 293,
-            "h": 73,
+            "x": 186,
+            "y": 720,
+            "w": 289,
+            "h": 53,
             "name": "bottom_left_bookshelf",
             "type": "bookshelf",
             "enabled": true
@@ -344,8 +344,8 @@
             "enabled": true
         },
         {
-            "x": 566,
-            "y": 842,
+            "x": 565,
+            "y": 865,
             "w": 42,
             "h": 16,
             "name": "new_35",
@@ -425,15 +425,6 @@
             "enabled": true
         },
         {
-            "x": 181,
-            "y": 839,
-            "w": 19,
-            "h": 16,
-            "name": "new_44",
-            "type": "solid",
-            "enabled": true
-        },
-        {
             "x": 162,
             "y": 851,
             "w": 43,
@@ -493,5 +484,6 @@
     "interactables": [],
     "doors": [],
     "walkable_zones": [],
-    "character_scale": 0.75
+    "character_scale": 0.75,
+    "pathfinding_cell_size": 24
 }

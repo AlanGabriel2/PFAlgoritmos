@@ -394,5 +394,5 @@
     "interactables": [],
     "doors": [],
     "walkable_zones": [],
-    "pathfinding_cell_size": 48
+    "pathfinding_cell_size": 24
 }

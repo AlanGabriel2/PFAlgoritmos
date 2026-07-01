@@ -11,7 +11,7 @@ def draw_purple_cross_bg(surface, width, height, time_offset=0):
     spacing = 64
     offset_x = (time_offset // 2) % spacing
     offset_y = (time_offset // 2) % spacing
-    
+
     for y in range(-spacing, height + spacing, spacing):
         for x in range(-spacing, width + spacing, spacing):
             px = x + offset_x
@@ -22,7 +22,7 @@ def draw_purple_cross_bg(surface, width, height, time_offset=0):
 def render_3d_gradient_text(text, font):
     base_text = font.render(text, True, (255, 255, 255))
     w, h = base_text.get_size()
-    
+
     # Create gradient surface
     grad_surf = pygame.Surface((w, h), pygame.SRCALPHA)
     for y in range(h):
@@ -31,17 +31,17 @@ def render_3d_gradient_text(text, font):
         g = int(255 - ratio * 120)
         b = int(200 - ratio * 200)
         pygame.draw.line(grad_surf, (r, g, b), (0, y), (w, y))
-        
+
     grad_surf.blit(base_text, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-    
+
     # Create shadow
     shadow_depth = 6
     final_surf = pygame.Surface((w + shadow_depth, h + shadow_depth), pygame.SRCALPHA)
-    
+
     shadow_text = font.render(text, True, (50, 0, 60))
     for i in range(shadow_depth, 0, -1):
         final_surf.blit(shadow_text, (i, i))
-        
+
     final_surf.blit(grad_surf, (0, 0))
     return final_surf
 
@@ -51,12 +51,40 @@ def scale_to_cover(image, target_w, target_h):
     new_w = int(img_w * scale)
     new_h = int(img_h * scale)
     scaled = pygame.transform.smoothscale(image, (new_w, new_h))
-    
+
     surf = pygame.Surface((target_w, target_h))
     offset_x = (new_w - target_w) // 2
     offset_y = (new_h - target_h) // 2
     surf.blit(scaled, (-offset_x, -offset_y))
     return surf
+
+
+def crop_transparent_padding(image):
+    bounds = image.get_bounding_rect(min_alpha=1)
+    if bounds.width <= 0 or bounds.height <= 0:
+        return image
+
+    cropped = pygame.Surface((bounds.width, bounds.height), pygame.SRCALPHA)
+    cropped.blit(image, (0, 0), bounds)
+    return cropped
+
+
+def scale_to_fit(image, max_width, max_height):
+    img_w, img_h = image.get_size()
+    if img_w <= 0 or img_h <= 0:
+        return image
+
+    scale = min(max_width / img_w, max_height / img_h)
+    new_w = max(1, int(img_w * scale))
+    new_h = max(1, int(img_h * scale))
+    return pygame.transform.scale(image, (new_w, new_h))
+
+
+def load_title_image(max_width, max_height):
+    image = pygame.image.load("assets/images/ui/titulo_juego.png").convert_alpha()
+    image = crop_transparent_padding(image)
+    return scale_to_fit(image, max_width, max_height)
+
 
 class DisclaimerScreen:
     def __init__(self, width, height, font_lg, font_md):
@@ -79,11 +107,11 @@ class DisclaimerScreen:
     def draw(self, surface):
         self.time += 1
         surface.fill((10, 10, 15)) # Fondo oscuro
-        
+
         # Ícono animado de guardado
         cx = self.width // 2
         cy = self.height // 3
-        
+
         if self.save_img:
             # Pálpito sutil
             scale_factor = 1.0 + 0.15 * abs(math.sin(self.time * 0.05))
@@ -113,27 +141,26 @@ class TitleScreen:
         self.font_md = font_md
         self.time = 0
         try:
-            self.title_img = pygame.image.load("assets/images/ui/titulo_juego.png").convert_alpha()
-            self.title_img = pygame.transform.scale(self.title_img, (950, 518)) # Más grande
+            self.title_img = load_title_image(int(width * 0.9), int(height * 0.43))
         except:
             self.title_img = None
-            
+
         try:
             self.bg_img = pygame.image.load("assets/images/backgrounds/bg_portada.jpg").convert()
             self.bg_img = pygame.transform.scale(self.bg_img, (width, height))
         except:
             self.bg_img = None
-        
+
     def handle_event(self, event, mouse_x=0, mouse_y=0):
         if event.type == pygame.KEYDOWN:
             return "START"
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             return "START"
         return None
-        
+
     def draw(self, surface):
         self.time += 1
-        
+
         if hasattr(self, 'bg_img') and self.bg_img:
             surface.blit(self.bg_img, (0, 0))
             # Oscurecer la imagen para que resalte el texto
@@ -142,34 +169,46 @@ class TitleScreen:
             surface.blit(overlay, (0, 0))
         else:
             draw_purple_cross_bg(surface, self.width, self.height, self.time)
-        
+
+        title_center_y = self.height // 2 - 55
         if self.title_img:
             # Un poco más abajo (casi en el medio)
-            title_rect = self.title_img.get_rect(center=(self.width // 2, self.height // 2 - 40))
+            title_rect = self.title_img.get_rect(center=(self.width // 2, title_center_y))
             surface.blit(self.title_img, title_rect)
         else:
             title_surf = render_3d_gradient_text("MEGA-CALABOZO DAG", self.font_title)
-            title_rect = title_surf.get_rect(center=(self.width // 2, self.height // 2 - 40))
+            title_rect = title_surf.get_rect(center=(self.width // 2, title_center_y))
             surface.blit(title_surf, title_rect)
-        
-        # Blinking text
-        if (self.time // 30) % 2 == 0:
-            start_text = self.font_md.render("PRESIONA CUALQUIER TECLA", True, (255, 255, 200))
-            # Subirlo más (acercarlo aún más al título)
-            start_rect = start_text.get_rect(center=(self.width // 2, self.height - 180))
-            
-            # Shadow for start text
-            shadow = self.font_md.render("PRESIONA CUALQUIER TECLA", True, (50, 0, 60))
-            surface.blit(shadow, (start_rect.x + 3, start_rect.y + 3))
-            surface.blit(start_text, start_rect)
+
+        prompt_center_y = min(self.height - 90, title_rect.bottom + 38)
+
+        # Smooth fade prompt
+        fade_phase = 0.5 + 0.5 * math.sin(self.time * 0.045)
+        fade_phase = fade_phase * fade_phase * (3 - 2 * fade_phase)
+        prompt_alpha = int(55 + 200 * fade_phase)
+        start_text = self.font_md.render("PRESIONA CUALQUIER TECLA", True, (255, 255, 200))
+        start_text.set_alpha(prompt_alpha)
+        start_rect = start_text.get_rect(center=(self.width // 2, prompt_center_y))
+
+        shadow = self.font_md.render("PRESIONA CUALQUIER TECLA", True, (50, 0, 60))
+        shadow.set_alpha(int(prompt_alpha * 0.55))
+        surface.blit(shadow, (start_rect.x + 3, start_rect.y + 3))
+        surface.blit(start_text, start_rect)
 
 class MainMenu:
-    def __init__(self, width, height, font_lg, font_md):
+    def __init__(self, width, height, font_lg, font_md, global_data=None):
         self.width = width
         self.height = height
         self.font_lg = font_lg
         self.font_md = font_md
-        self.options = ["Jugar", "Tutorial", "Opciones", "Salir"]
+
+        self.tutorial_completed = global_data.get("tutorial_completed", False) if global_data else False
+
+        if self.tutorial_completed:
+            self.options = ["Jugar", "Tutorial", "Opciones", "Salir"]
+        else:
+            self.options = ["Tutorial", "Opciones", "Salir"]
+
         self.jugar_expanded = False
         self.selected_index = 0
         self.time = 0
@@ -177,12 +216,10 @@ class MainMenu:
         self.notification_timer = 0
         self.option_rects = []
         try:
-            self.title_img = pygame.image.load("assets/images/ui/titulo_juego.png").convert_alpha()
-            # Escalar si es necesario
-            self.title_img = pygame.transform.scale(self.title_img, (600, 200))
+            self.title_img = load_title_image(int(width * 0.62), int(height * 0.32))
         except:
             self.title_img = None
-            
+
         try:
             self.bg_img_raw = pygame.image.load("assets/images/backgrounds/bg_portada.jpg").convert()
             self.bg_w = int(self.width * 1.1)
@@ -228,7 +265,7 @@ class MainMenu:
     def handle_event(self, event, mouse_x=0, mouse_y=0):
         self.update_option_rects()
         opts = self.current_options
-        
+
         if event.type == pygame.MOUSEMOTION:
             for rect, i in self.option_rects:
                 if rect.collidepoint(mouse_x, mouse_y):
@@ -263,32 +300,32 @@ class MainMenu:
 
     def draw(self, surface, mouse_x, mouse_y):
         self.time += 1
-        
+
         if hasattr(self, 'bg_img') and self.bg_img:
             # Calculate parallax offset based on mouse position relative to center
             # Mouse goes left -> image shifts right
             offset_x = -((mouse_x / self.width) - 0.5) * (self.bg_w - self.width)
             offset_y = -((mouse_y / self.height) - 0.5) * (self.bg_h - self.height)
-            
+
             # Base position is centered to hide edges
             base_x = -(self.bg_w - self.width) // 2
             base_y = -(self.bg_h - self.height) // 2
-            
+
             surface.blit(self.bg_img, (base_x + offset_x, base_y + offset_y))
-            
+
             # Oscurecer la imagen para que resalte el texto
             overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 160))
             surface.blit(overlay, (0, 0))
         else:
             draw_purple_cross_bg(surface, self.width, self.height, self.time)
-        
+
         title_y = self.height // 4
-        
+
         # Animación sutil de leve pálpito (Scale pulse) para el estilo pixel art
         # La escala variará muy sutilmente entre 1.0 y 1.04
         scale_factor = 1.0 + 0.04 * abs(math.sin(self.time * 0.05))
-        
+
         if self.title_img:
             new_w = int(self.title_img.get_width() * scale_factor)
             new_h = int(self.title_img.get_height() * scale_factor)
@@ -308,7 +345,7 @@ class MainMenu:
         for i, option in enumerate(opts):
             is_submenu = option.startswith("  ")
             display_text = option.strip()
-            
+
             if i == self.selected_index:
                 if is_submenu:
                     color = (220, 220, 220)
@@ -323,7 +360,7 @@ class MainMenu:
                 if is_submenu:
                     color = (130, 130, 130) # Un poco más opaco/oscuro para submenu
                 text = self.font_md.render(display_text, True, color)
-                
+
             rect = text.get_rect(center=(self.width // 2, self.height // 2 + i * 45))
             if i == self.selected_index:
                 surface.blit(shadow, (rect.x + 3, rect.y + 3))
@@ -366,7 +403,7 @@ class PlaySubMenu:
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 200))
         surface.blit(overlay, (0, 0))
-        
+
         title = self.font_lg.render("SELECCIONA MODO", True, (255, 255, 255))
         title_rect = title.get_rect(center=(self.width // 2, self.height // 4))
         surface.blit(title, title_rect)
@@ -399,7 +436,7 @@ class SlotSelectMenu:
         for i in range(3):
             slot_name = f"Slot {i+1}"
             has_save = self.save_manager.has_save(i+1)
-            
+
             if self.mode == "CARGAR" and not has_save:
                 opt_str = f"{slot_name}: VACIO"
                 text = self.font_md.render(opt_str, True, (100, 100, 100))
@@ -409,16 +446,16 @@ class SlotSelectMenu:
                     text = self.font_md.render("> " + opt_str + " <", True, (255, 255, 255))
                 else:
                     text = self.font_md.render(opt_str, True, (150, 150, 150))
-                    
+
             rect = text.get_rect(center=(self.width // 2, self.height // 2 - 30 + i * 50))
             self.option_rects.append((rect, i))
-            
+
         # Rect for "Regresar"
         back_color = (255, 255, 255) if self.selected_index == 3 else (150, 150, 150)
         back_text = self.font_md.render("> Regresar <" if self.selected_index == 3 else "Regresar", True, back_color)
         back_rect = back_text.get_rect(center=(self.width // 2, self.height // 2 + 3 * 60 + 20))
         self.option_rects.append((back_rect, 3))
-        
+
         self.confirm_rects = []
         if self.confirming_slot:
             opts = ["NO", "SI"]
@@ -429,7 +466,7 @@ class SlotSelectMenu:
 
     def handle_event(self, event, mouse_x=0, mouse_y=0):
         self.update_option_rects()
-        
+
         if event.type == pygame.MOUSEMOTION:
             if self.confirming_slot:
                 for rect, i in self.confirm_rects:
@@ -482,7 +519,7 @@ class SlotSelectMenu:
                 elif event.key == pygame.K_ESCAPE:
                     self.confirming_slot = None
                 return None
-            
+
             if event.key == pygame.K_UP:
                 self.selected_index = (self.selected_index - 1) % len(self.options)
             elif event.key == pygame.K_DOWN:
@@ -508,13 +545,13 @@ class SlotSelectMenu:
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 220))
         surface.blit(overlay, (0, 0))
-        
+
         if self.confirming_slot:
             warn_t1 = self.font_md.render(f"¿Seguro que quieres sobreescribir el {self.confirming_slot}?", True, (255, 100, 100))
             warn_t2 = self.font_md.render("No podras recuperar la partida actual.", True, (200, 200, 200))
             surface.blit(warn_t1, warn_t1.get_rect(center=(self.width // 2, self.height // 2 - 30)))
             surface.blit(warn_t2, warn_t2.get_rect(center=(self.width // 2, self.height // 2 + 10)))
-            
+
             opts = ["NO", "SI"]
             for idx, opt in enumerate(opts):
                 color = (255, 255, 255) if idx == self.confirm_index else (150, 150, 150)
@@ -531,19 +568,19 @@ class SlotSelectMenu:
         for i in range(3):
             slot_name = f"Slot {i+1}"
             has_save = self.save_manager.has_save(i+1)
-            
+
             if self.mode == "CARGAR" and not has_save:
                 color = (100, 100, 100) # Gris oscuro
                 opt_str = f"{slot_name}: VACIO"
             else:
                 color = (255, 255, 255) if i == self.selected_index else (150, 150, 150)
                 opt_str = f"{slot_name}: {'EXISTE' if has_save else 'VACIO'}"
-                
+
             if i == self.selected_index:
                 text = self.font_md.render("> " + opt_str + " <", True, (255, 255, 0) if (self.mode=="NUEVA" or has_save) else (150, 150, 0))
             else:
                 text = self.font_md.render(opt_str, True, color)
-                
+
             rect = text.get_rect(center=(self.width // 2, self.height // 2 + i * 60))
             surface.blit(text, rect)
 
@@ -578,7 +615,7 @@ class PauseMenu:
 
     def handle_event(self, event, mouse_x=0, mouse_y=0):
         self.update_option_rects()
-        
+
         if event.type == pygame.MOUSEMOTION:
             for rect, i in self.option_rects:
                 if rect.collidepoint(mouse_x, mouse_y):
@@ -608,7 +645,7 @@ class PauseMenu:
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))
         surface.blit(overlay, (0, 0))
-        
+
         title = self.font_lg.render("PAUSA", True, (255, 255, 255))
         title_rect = title.get_rect(center=(self.width // 2, self.height // 4))
         surface.blit(title, title_rect)
@@ -616,10 +653,10 @@ class PauseMenu:
         for i, option in enumerate(self.options):
             color = (255, 255, 255) if i == self.selected_index else (150, 150, 150)
             text = self.font_md.render(option, True, color)
-            
+
             if i == self.selected_index:
                 text = self.font_md.render("> " + option + " <", True, (255, 255, 0))
-                
+
             rect = text.get_rect(center=(self.width // 2, self.height // 2 + i * 60))
             surface.blit(text, rect)
 
@@ -631,7 +668,7 @@ class BestiaryMenu:
         self.font_md = font_md
         self.font_sm = font_sm
         self.save_manager = save_manager
-        
+
         # Instantiate dummy enemies to get their sprites and stats
         self.enemies_data = [
             {"class": BugEnemy, "name": "BUG", "desc": "Errores de codigo. Veloces, erraticos, pero fragiles."},
@@ -641,29 +678,29 @@ class BestiaryMenu:
             {"class": MiniBoss, "name": "MINI BOSS (PARCIAL)", "desc": "Evaluacion critica. Extremadamente resistente, lanza temibles 'Examenes Reprobados' (F). Aparece al final de las rondas de la malla curricular."},
             {"class": Boss, "name": "MEGA BOSS (TITULACION)", "desc": "El obstaculo academico final. Defensa casi impenetrable. Te acribillara con feroces 'Tesis Rechazadas' mientras el jurado sigue enviando problemas sin cesar."}
         ]
-        
+
         self.instances = []
         for data in self.enemies_data:
             enemy_instance = data["class"](0, 0)
             enemy_instance.animator.animation_speed = 0.05 # Slower animation for Bestiary
             self.instances.append(enemy_instance)
-            
+
         self.current_index = 0
-        
+
         # Load unlocks from global save
         self.unlocked_names = ["BUG", "CODIGO SPAGHETTI", "MEMORY LEAK", "EL RELOJ (DEADLINE)"]
         if self.save_manager:
             global_data = self.save_manager.load_global_save()
             self.unlocked_names = global_data.get("bestiary_unlocks", self.unlocked_names)
-        
+
         # Load assets
         try:
             self.bg_img = pygame.image.load("assets/images/ui/bestiary_bg.png").convert()
             self.bg_img = pygame.transform.scale(self.bg_img, (self.width, self.height))
-            
+
             arr_l = pygame.image.load("assets/images/ui/arrow_left.png").convert_alpha()
             self.arrow_left = pygame.transform.scale(arr_l, (64, 64))
-            
+
             arr_r = pygame.image.load("assets/images/ui/arrow_right.png").convert_alpha()
             self.arrow_right = pygame.transform.scale(arr_r, (64, 64))
         except Exception as e:
@@ -671,10 +708,10 @@ class BestiaryMenu:
             self.bg_img = None
             self.arrow_left = None
             self.arrow_right = None
-            
+
         self.left_rect = None
         self.right_rect = None
-        
+
     def unlock(self, name):
         if name not in self.unlocked_names:
             self.unlocked_names.append(name)
@@ -709,55 +746,64 @@ class BestiaryMenu:
             surface.blit(self.bg_img, (0, 0))
         else:
             surface.fill((11, 11, 11))
-        
+
         # UI Top Left
         title = self.font_lg.render("ENEMIGOS", True, (255, 255, 255))
         surface.blit(title, (40, 40))
-        
+
         current_data = self.enemies_data[self.current_index]
         enemy_name_str = current_data["name"]
-        
+
         is_unlocked = enemy_name_str in self.unlocked_names
-        
+
         # Draw Enemy or Silhouette
         enemy_inst = self.instances[self.current_index]
         enemy_inst.animator.update()
         img = enemy_inst.animator.get_current_image()
-        
+
         name_y = self.height // 2 - 150
         desc_y = self.height // 2 + 120
         stats_y = self.height // 2 + 150
-        
+
         if img:
             if not is_unlocked:
                 # Create silhouette
                 silhouette = img.copy()
                 silhouette.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 img = silhouette
-                
-            # Scale up for bestiary viewing
-            scaled_img = pygame.transform.scale(img, (img.get_width() * 2, img.get_height() * 2))
+
+            # Scale up for bestiary viewing, but don't overscale large bosses
+            if isinstance(enemy_inst, Boss):
+                scale_factor = 1
+            elif isinstance(enemy_inst, MiniBoss):
+                scale_factor = 1.5
+            elif isinstance(enemy_inst, DeadlineEnemy):
+                scale_factor = 1.2
+            else:
+                scale_factor = 2
+
+            scaled_img = pygame.transform.scale(img, (int(img.get_width() * scale_factor), int(img.get_height() * scale_factor)))
             img_rect = scaled_img.get_rect(center=(self.width // 2, self.height // 2))
-            
+
             surface.blit(scaled_img, img_rect)
-            
+
             # Adjust text positions dynamically based on sprite size
             name_y = min(name_y, img_rect.top - 30)
             desc_y = max(desc_y, img_rect.bottom + 20)
             stats_y = max(stats_y, img_rect.bottom + 50)
-            
+
             # Position arrows based on image width to avoid overlapping the sprite
             left_arrow_x = min(self.width // 2 - 200, img_rect.left - 50)
             right_arrow_x = max(self.width // 2 + 200, img_rect.right + 50)
         else:
             left_arrow_x = self.width // 2 - 200
             right_arrow_x = self.width // 2 + 200
-            
+
         # Title Centered
         display_name = enemy_name_str if is_unlocked else "???"
         name_text = self.font_md.render(display_name, True, (255, 255, 255))
         surface.blit(name_text, name_text.get_rect(center=(self.width // 2, name_y)))
-        
+
         # Draw Arrows
         if hasattr(self, 'arrow_left') and self.arrow_left:
             self.left_rect = self.arrow_left.get_rect(center=(left_arrow_x, self.height // 2))
@@ -766,7 +812,7 @@ class BestiaryMenu:
             left_arrow = self.font_lg.render("<", True, (255, 255, 255))
             self.left_rect = left_arrow.get_rect(center=(left_arrow_x, self.height // 2))
             surface.blit(left_arrow, self.left_rect)
-            
+
         if hasattr(self, 'arrow_right') and self.arrow_right:
             self.right_rect = self.arrow_right.get_rect(center=(right_arrow_x, self.height // 2))
             surface.blit(self.arrow_right, self.right_rect)
@@ -774,19 +820,19 @@ class BestiaryMenu:
             right_arrow = self.font_lg.render(">", True, (255, 255, 255))
             self.right_rect = right_arrow.get_rect(center=(right_arrow_x, self.height // 2))
             surface.blit(right_arrow, self.right_rect)
-            
+
         # Draw Description and Stats
         if is_unlocked:
             desc_text = self.font_sm.render(current_data["desc"], True, (200, 200, 200))
             surface.blit(desc_text, desc_text.get_rect(center=(self.width // 2, desc_y)))
-            
+
             stats_str = f"HP: {enemy_inst.max_hp}  |  Velocidad: {enemy_inst.speed}"
             stats_text = self.font_sm.render(stats_str, True, (255, 100, 100))
             surface.blit(stats_text, stats_text.get_rect(center=(self.width // 2, stats_y)))
         else:
             desc_text = self.font_sm.render("Aún no has encontrado a este enemigo.", True, (100, 100, 100))
             surface.blit(desc_text, desc_text.get_rect(center=(self.width // 2, desc_y)))
-        
+
         # Back hint
         back_text = self.font_sm.render("ESC para salir", True, (150, 150, 150))
         surface.blit(back_text, (40, self.height - 40))
@@ -798,23 +844,33 @@ class OptionsMenu:
         self.font_lg = font_lg
         self.font_md = font_md
         self.font_sm = font_sm
-        
-        self.options = ["Modo de Pantalla", "Resolución", "Volumen General", "Volumen Música", "Aplicar y Volver", "Volver sin guardar"]
+
+        self.options = ["Modo de Pantalla", "Resolución", "Relación de Aspecto", "Volumen General", "Volumen Música", "Aplicar y Volver", "Volver sin guardar"]
         self.selected_index = 0
-        
+
         self.fullscreen = global_data.get("fullscreen", True) if global_data else True
-        self.available_resolutions = pygame.display.list_modes()
-        if not self.available_resolutions:
-            self.available_resolutions = [(1024, 768)]
-        if (1024, 768) not in self.available_resolutions:
-            self.available_resolutions.append((1024, 768))
-            self.available_resolutions.sort(reverse=True)
-            
+        modes = pygame.display.list_modes()
+        if modes == -1:
+            modes = []
+        self.available_resolutions = list(modes)
+        common_resolutions = [(1920, 1080), (1600, 900), (1366, 768), (1280, 720), (1024, 576)]
+        for res in common_resolutions:
+            if res not in self.available_resolutions:
+                self.available_resolutions.append(res)
+        self.available_resolutions = sorted(set(self.available_resolutions), reverse=True)
+
         self.res_index = 0
         info = pygame.display.Info()
-        
+
         saved_res = global_data.get("resolution", None) if global_data else None
-        
+        if isinstance(saved_res, (list, tuple)) and len(saved_res) >= 2:
+            saved_res = (int(saved_res[0]), int(saved_res[1]))
+        else:
+            saved_res = None
+        if saved_res and saved_res not in self.available_resolutions:
+            self.available_resolutions.append(saved_res)
+            self.available_resolutions = sorted(set(self.available_resolutions), reverse=True)
+
         for i, res in enumerate(self.available_resolutions):
             if saved_res and res[0] == saved_res[0] and res[1] == saved_res[1]:
                 self.res_index = i
@@ -822,13 +878,24 @@ class OptionsMenu:
             elif not saved_res and res[0] == info.current_w and res[1] == info.current_h:
                 self.res_index = i
                 break
-                
+
+        self.aspect_modes = [
+            ("fit", "16:9 completo"),
+            ("fill", "Llenar sin estirar"),
+        ]
+        saved_aspect = global_data.get("aspect_mode", "fit") if global_data else "fit"
+        self.aspect_index = 0
+        for i, (value, _) in enumerate(self.aspect_modes):
+            if value == saved_aspect:
+                self.aspect_index = i
+                break
+
         self.general_volume = global_data.get("volume", 100) if global_data else 100
         self.music_volume = global_data.get("music_volume", 100) if global_data else 100
         self.time = 0
         self.option_rects = []
         self.arrow_rects = []
-        
+
         try:
             self.bg_img = pygame.image.load("assets/images/ui/config_bg.png").convert()
             self.bg_img = scale_to_cover(self.bg_img, self.width, self.height)
@@ -851,7 +918,7 @@ class OptionsMenu:
         self.arrow_rects = []
         start_y = self.height // 3
         spacing = 50
-        
+
         for i, option in enumerate(self.options):
             value_str = ""
             if option == "Modo de Pantalla":
@@ -859,54 +926,56 @@ class OptionsMenu:
             elif option == "Resolución":
                 r = self.available_resolutions[self.res_index]
                 value_str = f"{r[0]}x{r[1]}"
+            elif option == "Relación de Aspecto":
+                value_str = self.aspect_modes[self.aspect_index][1]
             elif option == "Volumen General":
                 value_str = f"{self.general_volume}%"
             elif option == "Volumen Música":
                 value_str = f"{self.music_volume}%"
-                
+
             display_text = f"  {option}: {value_str}  " if value_str else f"  {option}  "
             if i == self.selected_index:
                 display_text = f"> {option}: {value_str} <" if value_str else f"> {option} <"
-                
+
             text_surf = self.font_md.render(display_text, True, (255, 255, 255))
             rect = text_surf.get_rect(center=(self.width // 2, start_y + i * spacing))
-            
+
             # The central option rect (for hover and selecting)
             self.option_rects.append((rect, i))
-            
-            # If the option has a value (i < 4), create large arrow hitboxes on left and right
-            if i < 4 and i == self.selected_index:
+
+            # If the option has a value, create large arrow hitboxes on left and right
+            if option not in ("Aplicar y Volver", "Volver sin guardar") and i == self.selected_index:
                 # Left arrow hitbox (wide)
                 left_rect = pygame.Rect(rect.left - 40, rect.top - 10, 80, rect.height + 20)
                 # Right arrow hitbox (wide)
                 right_rect = pygame.Rect(rect.right - 40, rect.top - 10, 80, rect.height + 20)
-                
+
                 self.arrow_rects.append((left_rect, i, -1))
                 self.arrow_rects.append((right_rect, i, 1))
 
     def handle_event(self, event, mouse_x=0, mouse_y=0):
         self.update_option_rects()
-        
+
         if event.type == pygame.MOUSEMOTION:
             for rect, i in self.option_rects:
                 if rect.collidepoint(mouse_x, mouse_y):
                     self.selected_index = i
             return None
-            
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # Check arrow clicks first (if already selected)
             for rect, i, direction in self.arrow_rects:
                 if rect.collidepoint(mouse_x, mouse_y) and i == self.selected_index:
                     self.adjust_option(direction)
                     return None
-                    
+
             # Check general option clicks
             for rect, i in self.option_rects:
                 if rect.collidepoint(mouse_x, mouse_y):
                     self.selected_index = i
                     opt = self.options[self.selected_index]
                     if opt == "Aplicar y Volver":
-                        return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "gen_vol": self.general_volume, "mus_vol": self.music_volume}
+                        return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume}
                     elif opt == "Volver sin guardar":
                         return {"action": "BACK"}
                     else:
@@ -927,19 +996,21 @@ class OptionsMenu:
             elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                 opt = self.options[self.selected_index]
                 if opt == "Aplicar y Volver":
-                    return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "gen_vol": self.general_volume, "mus_vol": self.music_volume}
+                    return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume}
                 elif opt == "Volver sin guardar":
                     return {"action": "BACK"}
                 else:
                     self.adjust_option(1)
         return None
-        
+
     def adjust_option(self, direction):
         opt = self.options[self.selected_index]
         if opt == "Modo de Pantalla":
             self.fullscreen = not self.fullscreen
         elif opt == "Resolución":
             self.res_index = (self.res_index + direction) % len(self.available_resolutions)
+        elif opt == "Relación de Aspecto":
+            self.aspect_index = (self.aspect_index + direction) % len(self.aspect_modes)
         elif opt == "Volumen General":
             self.general_volume = max(0, min(100, self.general_volume + direction * 10))
         elif opt == "Volumen Música":
@@ -947,7 +1018,7 @@ class OptionsMenu:
 
     def draw(self, surface):
         self.time += 1
-        
+
         if hasattr(self, 'bg_img') and self.bg_img:
             surface.blit(self.bg_img, (0, 0))
             overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -955,38 +1026,40 @@ class OptionsMenu:
             surface.blit(overlay, (0, 0))
         else:
             draw_purple_cross_bg(surface, self.width, self.height, self.time)
-        
+
         title_surf = render_3d_gradient_text("OPCIONES", self.font_lg)
         title_rect = title_surf.get_rect(center=(self.width // 2, self.height // 5))
         surface.blit(title_surf, title_rect)
-        
+
         start_y = self.height // 3
         spacing = 50
-        
+
         for i, option in enumerate(self.options):
             color = (255, 255, 255) if i == self.selected_index else (150, 150, 150)
             prefix = "> " if i == self.selected_index else "  "
             suffix = " <" if i == self.selected_index else "  "
-            
+
             value_str = ""
             if option == "Modo de Pantalla":
                 value_str = "Completa" if self.fullscreen else "Ventana"
             elif option == "Resolución":
                 r = self.available_resolutions[self.res_index]
                 value_str = f"{r[0]}x{r[1]}"
+            elif option == "Relación de Aspecto":
+                value_str = self.aspect_modes[self.aspect_index][1]
             elif option == "Volumen General":
                 value_str = f"{self.general_volume}%"
             elif option == "Volumen Música":
                 value_str = f"{self.music_volume}%"
-                
+
             display_text = f"{prefix}{option}: {value_str}{suffix}" if value_str else f"{prefix}{option}{suffix}"
-            
+
             text_surf = self.font_md.render(display_text, True, color)
             shadow = self.font_md.render(display_text, True, (50, 0, 50))
-            
+
             rect = text_surf.get_rect(center=(self.width // 2, start_y + i * spacing))
             surface.blit(shadow, (rect.x + 2, rect.y + 2))
             surface.blit(text_surf, rect)
-            
+
         help_text = self.font_sm.render("Usa las FLECHAS para moverte y cambiar valores. ENTER para seleccionar.", True, (200, 200, 200))
         surface.blit(help_text, help_text.get_rect(center=(self.width // 2, self.height - 40)))

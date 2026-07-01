@@ -560,15 +560,6 @@
             "enabled": true
         },
         {
-            "x": 402,
-            "y": 373,
-            "w": 53,
-            "h": 28,
-            "name": "new_59",
-            "type": "solid",
-            "enabled": true
-        },
-        {
             "x": 149,
             "y": 434,
             "w": 167,
@@ -599,7 +590,7 @@
             "x": 407,
             "y": 400,
             "w": 42,
-            "h": 67,
+            "h": 59,
             "name": "new_60",
             "type": "solid",
             "enabled": true

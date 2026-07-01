@@ -19,9 +19,27 @@ from tutorial import TutorialState
 pygame.init()
 
 # Configurar Pantalla
-WIDTH, HEIGHT = 1024, 768
+WIDTH, HEIGHT = 1280, 720
+
+
+def get_saved_display_mode():
+    data = save_manager.load_global_save()
+    saved_res = data.get("resolution", [WIDTH, HEIGHT])
+    if isinstance(saved_res, (list, tuple)) and len(saved_res) >= 2:
+        resolution = (int(saved_res[0]), int(saved_res[1]))
+    else:
+        resolution = (WIDTH, HEIGHT)
+    flags = pygame.FULLSCREEN if data.get("fullscreen", True) else 0
+    return resolution, flags
+
+
 # Crear la ventana real y la superficie virtual para el juego
-real_screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+_initial_resolution, _initial_flags = get_saved_display_mode()
+try:
+    real_screen = pygame.display.set_mode(_initial_resolution, _initial_flags)
+except pygame.error:
+    fallback_resolution = (0, 0) if _initial_flags & pygame.FULLSCREEN else (WIDTH, HEIGHT)
+    real_screen = pygame.display.set_mode(fallback_resolution, _initial_flags)
 screen = pygame.Surface((WIDTH, HEIGHT))
 pygame.display.set_caption("Mega-Calabozo DAG")
 
@@ -57,12 +75,12 @@ try:
     # La nueva imagen tiene 5 fotogramas en 1 fila
     hw = heart_sheet.get_width() // 5
     hh = heart_sheet.get_height() // 1
-    
+
     for c in range(5):
         rect = pygame.Rect(c * hw, 0, hw, hh)
         frame = pygame.Surface((hw, hh), pygame.SRCALPHA)
         frame.blit(heart_sheet, (0, 0), rect)
-        
+
         bbox = frame.get_bounding_rect()
         if bbox.width > 0 and bbox.height > 0:
             # Crear un cuadrado perfecto (400x400) para centrar y evitar deformación
@@ -70,7 +88,7 @@ try:
             offset_x = (400 - bbox.width) // 2
             offset_y = (400 - bbox.height) // 2
             square.blit(frame, (offset_x, offset_y), bbox)
-            
+
             cropped = pygame.transform.scale(square, (28, 28)) # Tamaño reducido
             HEART_FRAMES.append(cropped)
 except Exception as e:
@@ -106,24 +124,76 @@ def draw_floor(surface, background, offset_x=0, offset_y=0):
         pygame.draw.rect(surface, (40, 30, 30), (0, 0, WIDTH, HEIGHT))
 
 
+
+def render_text_fit(font, text, color, max_width, antialias=False):
+    text_surface = font.render(text, antialias, color)
+    if text_surface.get_width() <= max_width:
+        return text_surface
+
+    scale = max_width / max(1, text_surface.get_width())
+    new_width = max(1, int(text_surface.get_width() * scale))
+    new_height = max(1, int(text_surface.get_height() * scale))
+    return pygame.transform.scale(text_surface, (new_width, new_height))
+
+
+def draw_centered_text_fit(surface, text, font, center, color, max_width, antialias=False):
+    text_surface = render_text_fit(font, text, color, max_width, antialias)
+    text_rect = text_surface.get_rect(center=center)
+    surface.blit(text_surface, text_rect)
+    return text_rect
+
+
+def get_viewport_transform(target_size, aspect_mode="fit"):
+    target_w, target_h = target_size
+    if target_w <= 0 or target_h <= 0:
+        return 1.0, 0, 0, WIDTH, HEIGHT
+
+    if aspect_mode == "fill":
+        scale = max(target_w / WIDTH, target_h / HEIGHT)
+    else:
+        scale = min(target_w / WIDTH, target_h / HEIGHT)
+    scaled_w = max(1, int(WIDTH * scale))
+    scaled_h = max(1, int(HEIGHT * scale))
+    offset_x = (target_w - scaled_w) // 2
+    offset_y = (target_h - scaled_h) // 2
+    return scale, offset_x, offset_y, scaled_w, scaled_h
+
+
+def window_to_virtual(pos, target_size, aspect_mode="fit"):
+    scale, offset_x, offset_y, _, _ = get_viewport_transform(target_size, aspect_mode)
+    if scale <= 0:
+        return 0, 0
+
+    x = int((pos[0] - offset_x) / scale)
+    y = int((pos[1] - offset_y) / scale)
+    return max(0, min(WIDTH - 1, x)), max(0, min(HEIGHT - 1, y))
+
+
+def present_virtual_surface(virtual_surface, target_surface, aspect_mode="fit"):
+    _, offset_x, offset_y, scaled_w, scaled_h = get_viewport_transform(target_surface.get_size(), aspect_mode)
+    target_surface.fill((0, 0, 0))
+    scaled_surface = pygame.transform.scale(virtual_surface, (scaled_w, scaled_h))
+    target_surface.blit(scaled_surface, (offset_x, offset_y))
+
+
 def main():
     save_mgr = save_manager
     global_data = save_mgr.load_global_save()
     global screen, real_screen
     clock = pygame.time.Clock()
-    
+
     # Inicializar Sistemas del Juego
     engine = DagEngine()
     map_gen = MapGenerator(engine)
     par_score = engine.get_par_score()
-    
+
     # Variables de Estado del Juego
     game_state = "DISCLAIMER_SCREEN" # TITLE_SCREEN, MAIN_MENU, TUTORIAL, BESTIARY, MAP, COMBAT, WIN, GAME_OVER
     semester_counter = 1
     max_energy = 6
     energy = 6
     rest_animation_timer = 0
-    
+
     title_screen = TitleScreen(WIDTH, HEIGHT, font_title, font_md)
     disclaimer_screen = DisclaimerScreen(WIDTH, HEIGHT, font_lg, font_md)
     play_sub_menu = PlaySubMenu(WIDTH, HEIGHT, font_lg, font_md)
@@ -131,19 +201,23 @@ def main():
     slot_select_menu = None
     save_indicator_timer = 0
     current_slot = 1
-    main_menu = MainMenu(WIDTH, HEIGHT, font_lg, font_md)
+    main_menu = MainMenu(WIDTH, HEIGHT, font_lg, font_md, global_data)
     bestiary_menu = BestiaryMenu(WIDTH, HEIGHT, font_lg, font_md, font_sm, save_mgr)
-    tutorial_state = TutorialState(WIDTH, HEIGHT, font_lg, font_md, font_sm)
+    tutorial_state = TutorialState(WIDTH, HEIGHT, font_lg, font_md, font_sm, HEART_FRAMES)
     pause_menu = PauseMenu(WIDTH, HEIGHT, font_lg, font_md)
     options_menu = OptionsMenu(WIDTH, HEIGHT, font_lg, font_md, font_sm, global_data)
+    aspect_mode = global_data.get("aspect_mode", "fit")
+    if aspect_mode not in ("fit", "fill"):
+        aspect_mode = "fit"
     previous_state = None
-    
+    options_return_state = "MAIN_MENU"
+
     # Variables de la Cámara del Mapa
     camera_x, camera_y = 0, 0
     dragging = False
     last_mouse_pos = (0, 0)
     selected_node = None
-    
+
     current_room = None
     combat_player = None
     enemies = []
@@ -156,15 +230,15 @@ def main():
     debug_enemy_paths = False
     editor_mode = False
     editor = CollisionEditor(current_level, collision_manager)
-    
+
     combat_cam_x, combat_cam_y = 0, 0
-    
+
     current_wave = 1
     max_waves = 1
     wave_timer = 0
-    
+
     floating_texts = [] # Lista para almacenar los números de daño flotantes
-    
+
     trans_state = {
         "active": False,
         "progress": 0.0,
@@ -172,7 +246,7 @@ def main():
         "type": "FADE",
         "old_surf": None
     }
-    
+
     def trigger_transition(target, t_type="FADE", speed=0.04):
         nonlocal game_state
         trans_state["active"] = True
@@ -181,6 +255,13 @@ def main():
         trans_state["type"] = t_type
         trans_state["old_surf"] = screen.copy()
         game_state = target
+
+    def finish_tutorial():
+        global_data["tutorial_completed"] = True
+        save_mgr.save_global_save(global_data)
+        main_menu.tutorial_completed = True
+        main_menu.options = ["Jugar", "Tutorial", "Opciones", "Salir"]
+        trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
 
     def combat_world_size():
         return current_level.width, current_level.height
@@ -294,16 +375,12 @@ def main():
     level_failed_done = False
     running = True
     while running:
-        # Escalar coordenadas del ratón
-        window_w, window_h = real_screen.get_size()
-        scale_x = WIDTH / window_w
-        scale_y = HEIGHT / window_h
+        # Convertir coordenadas del raton real a la superficie virtual 16:9.
         raw_mx, raw_my = pygame.mouse.get_pos()
-        mouse_x = int(raw_mx * scale_x)
-        mouse_y = int(raw_my * scale_y)
-        
+        mouse_x, mouse_y = window_to_virtual((raw_mx, raw_my), real_screen.get_size(), aspect_mode)
+
         keys = pygame.key.get_pressed()
-        
+
         # Selección por defecto
         if game_state == "MAP" and (selected_node is None or engine.state[selected_node] == NodeState.CLEANED):
             unlocked = [n for n in engine.nodes if engine.state[n] == NodeState.UNLOCKED]
@@ -316,10 +393,10 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-                
+
             if trans_state["active"]:
                 continue
-                
+
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                 pygame.display.toggle_fullscreen()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
@@ -338,13 +415,13 @@ def main():
                     debug_collisions = True
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
                 debug_enemy_paths = not debug_enemy_paths
-                
+
             if game_state == "TITLE_SCREEN":
                 action = title_screen.handle_event(event, mouse_x, mouse_y)
                 if action == "START":
                     main_menu.time = 0
                     trigger_transition("MAIN_MENU", "FADE", 0.03)
-                    
+
             elif game_state == "MAIN_MENU":
                 action = main_menu.handle_event(event, mouse_x, mouse_y)
                 if action == "Continuar Partida":
@@ -374,8 +451,10 @@ def main():
                     tutorial_state.reset()
                     trigger_transition("TUTORIAL", "SLIDE_LEFT", 0.05)
                 elif action == "Bestiario":
+                    previous_state = "MAIN_MENU"
                     trigger_transition("BESTIARY", "PIXELATE", 0.03)
                 elif action == "Opciones":
+                    options_return_state = "MAIN_MENU"
                     trigger_transition("OPTIONS", "SLIDE_LEFT", 0.05)
                 elif action == "Salir":
                     running = False
@@ -409,42 +488,55 @@ def main():
                 action = pause_menu.handle_event(event, mouse_x, mouse_y)
                 if action == "Continuar":
                     trigger_transition(previous_state, "FADE", 0.08)
+                elif action == "Opciones":
+                    options_return_state = "PAUSE"
+                    trigger_transition("OPTIONS", "SLIDE_LEFT", 0.05)
                 elif action == "Guardar y Salir al menú principal":
                     save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
                     trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
             elif game_state == "BESTIARY":
                 action = bestiary_menu.handle_event(event, mouse_x, mouse_y)
                 if action == "BACK":
-                    trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
+                    if previous_state == "TUTORIAL":
+                        tutorial_state.phase = 4 # TutorialPhase.OUTRO
+                        tutorial_state.timer = 0
+                        trigger_transition("TUTORIAL", "FADE", 0.05)
+                    else:
+                        trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
             elif game_state == "TUTORIAL":
                 action = tutorial_state.handle_event(event, mouse_x, mouse_y)
                 if action == "GO_TO_BESTIARY":
                     main_menu.unlock_bestiary()
+                    previous_state = "TUTORIAL"
                     trigger_transition("BESTIARY", "PIXELATE", 0.03)
-                    
+                elif action == "FINISH_TUTORIAL":
+                    finish_tutorial()
+
             elif game_state == "OPTIONS":
                 action = options_menu.handle_event(event, mouse_x, mouse_y)
                 if action:
                     if action["action"] == "BACK":
-                        trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
+                        trigger_transition(options_return_state, "SLIDE_RIGHT" if options_return_state == "MAIN_MENU" else "FADE", 0.05)
                     elif action["action"] == "APPLY":
                         res = action["res"]
                         fullscreen = action["fullscreen"]
                         gen_vol = action["gen_vol"]
-                        
+                        aspect_mode = action.get("aspect_mode", aspect_mode)
+
                         global_data["resolution"] = res
                         global_data["fullscreen"] = fullscreen
+                        global_data["aspect_mode"] = aspect_mode
                         global_data["volume"] = gen_vol
                         save_mgr.save_global_save(global_data)
-                        
-                        flags = 0
-                        if fullscreen:
-                            flags |= pygame.FULLSCREEN
-                            real_screen = pygame.display.set_mode((0, 0), flags)
-                        else:
+
+                        flags = pygame.FULLSCREEN if fullscreen else 0
+                        try:
                             real_screen = pygame.display.set_mode(res, flags)
-                        # We don't change internal WIDTH/HEIGHT so game logic remains at 1024x768
-                        trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
+                        except pygame.error:
+                            fallback_res = (0, 0) if fullscreen else (WIDTH, HEIGHT)
+                            real_screen = pygame.display.set_mode(fallback_res, flags)
+                        # La logica interna se mantiene en 1280x720; la ventana solo cambia el escalado final.
+                        trigger_transition(options_return_state, "SLIDE_RIGHT" if options_return_state == "MAIN_MENU" else "FADE", 0.05)
             elif game_state == "MAP":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     previous_state = "MAP"
@@ -470,25 +562,25 @@ def main():
                                 selected_node = clicked_node
                                 last_clicked_node = clicked_node
                                 last_click_time = current_time
-                                
+
                 elif event.type == pygame.MOUSEBUTTONUP:
                     if event.button == 3:
                         dragging = False
-                        
+
                 elif event.type == pygame.MOUSEMOTION:
                     if dragging:
                         dx, dy = event.pos[0] - last_mouse_pos[0], event.pos[1] - last_mouse_pos[1]
                         camera_x += dx
                         camera_y += dy
                         last_mouse_pos = event.pos
-                        
+
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r or event.key == pygame.K_SPACE: # Descansar / Avanzar Semestre
                         energy = max_energy
                         semester_counter += 1
                         engine.update_unlocks()
                         rest_animation_timer = 90 # 1.5 seconds animation
-                        
+
                     elif event.key == pygame.K_RETURN: # Entrar con Enter
                         if selected_node and engine.state[selected_node] == NodeState.UNLOCKED:
                             if energy > 0:
@@ -496,7 +588,7 @@ def main():
                             else:
                                 map_message = "¡No hay suficiente energía! Descansa para avanzar de semestre."
                                 map_message_timer = 180
-                                
+
                     elif event.key in [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]:
                         if selected_node and selected_node in map_gen.rooms:
                             current_rect = map_gen.rooms[selected_node].rect
@@ -507,13 +599,13 @@ def main():
                                 dx_ = r.rect.centerx - current_rect.centerx
                                 dy_ = r.rect.centery - current_rect.centery
                                 dist = math.hypot(dx_, dy_)
-                                
+
                                 valid = False
                                 if event.key == pygame.K_UP and dy_ < -abs(dx_): valid = True
                                 elif event.key == pygame.K_DOWN and dy_ > abs(dx_): valid = True
                                 elif event.key == pygame.K_LEFT and dx_ < -abs(dy_): valid = True
                                 elif event.key == pygame.K_RIGHT and dx_ > abs(dy_): valid = True
-                                
+
                                 if valid and dist < best_dist:
                                     best_dist = dist
                                     best_node = n
@@ -522,7 +614,7 @@ def main():
                                 target_room = map_gen.rooms[selected_node]
                                 camera_x = WIDTH//2 - target_room.rect.centerx
                                 camera_y = HEIGHT//2 - target_room.rect.centery
-                        
+
             elif game_state == "COMBAT":
                 if editor_mode:
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
@@ -536,7 +628,7 @@ def main():
                         combat_cam_x += dx
                         combat_cam_y += dy
                         last_mouse_pos = (mouse_x, mouse_y)
-                        
+
                     editor.handle_event(event, mouse_x, mouse_y, combat_cam_x, combat_cam_y)
                     continue
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -555,7 +647,9 @@ def main():
             if disclaimer_screen.time > 200 and not trans_state["active"]:
                 trigger_transition("TITLE_SCREEN", "FADE", 0.03)
         elif game_state == "TUTORIAL":
-            tutorial_state.update(keys, WIDTH, HEIGHT)
+            tutorial_action = tutorial_state.update(keys, WIDTH, HEIGHT, mouse_x, mouse_y)
+            if tutorial_action == "FINISH_TUTORIAL":
+                finish_tutorial()
         elif game_state == "COMBAT":
             world_w, world_h = combat_world_size()
             if not editor_mode:
@@ -565,32 +659,32 @@ def main():
                 if keys[pygame.K_DOWN]: dy += 1
                 if keys[pygame.K_LEFT]: dx -= 1
                 if keys[pygame.K_RIGHT]: dx += 1
-                
+
                 if dx != 0 or dy != 0:
                     combat_player.shoot_angle(math.atan2(dy, dx))
-                    
+
                 # Mouse drag shooting
                 if pygame.mouse.get_pressed()[0]:
                     combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
-                    
+
                 combat_player.move(keys, world_w, world_h, collision_manager)
                 combat_player.update_bullets(world_w, world_h)
-                
+
                 update_combat_camera(smooth=True)
-                
+
                 for enemy in enemies:
                     enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager, pathfinder=pathfinder, nearby_enemies=enemies)
-                    
+
                     if isinstance(enemy, MiniBoss):
                         bestiary_menu.unlock("MINI BOSS (PARCIAL)")
                     elif isinstance(enemy, Boss):
                         bestiary_menu.unlock("MEGA BOSS (TITULACIÓN)")
-                    
+
                     # El jugador recibe daño por contacto
                     if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
                         combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
                         enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
-                            
+
                     # El jugador recibe daño por balas enemigas
                     for b in enemy.bullets[:]:
                         dist = math.hypot(combat_player.x - b.x, combat_player.y - b.y)
@@ -598,14 +692,25 @@ def main():
                             combat_player.hp -= 15
                             if b in enemy.bullets:
                                 enemy.bullets.remove(b)
-                
+
+                    if hasattr(enemy, "collect_area_damage_events"):
+                        for hit in enemy.collect_area_damage_events(combat_player):
+                            combat_player.hp -= hit["damage"]
+                            floating_texts.append({
+                                "text": str(hit["damage"]),
+                                "x": hit["x"],
+                                "y": hit["y"] - 35,
+                                "life": 45,
+                                "color": (255, 125, 45)
+                            })
+
                 # Las balas golpean a los enemigos
                 for b in combat_player.bullets[:]:
                     for e in enemies[:]:
                         if e.collides_with_bullet(b):
                             damage = 10
                             e.hp -= damage
-                            
+
                             # Generar texto flotante de daño
                             floating_texts.append({
                                 "text": str(damage),
@@ -614,76 +719,76 @@ def main():
                                 "life": 40,
                                 "color": (255, 50, 50)
                             })
-                            
+
                             if b in combat_player.bullets:
                                 combat_player.bullets.remove(b)
                             if e.hp <= 0:
                                 enemies.remove(e)
-                
+
                 # Actualizar textos flotantes
                 for ft in floating_texts[:]:
                     ft["y"] -= 1.5  # Subir
                     ft["life"] -= 1 # Desvanecerse
                     if ft["life"] <= 0:
                         floating_texts.remove(ft)
-                
+
                 # Spawnear nuevas rondas
                 if current_wave < max_waves:
                     wave_timer -= 1
                     if wave_timer <= 0:
                         current_wave += 1
                         wave_timer = 300 # Reset timer para la siguiente ola
-                        
+
                         # Spawn desde la puerta del nivel activo
                         door_x, door_y = int(world_w * 0.85), int(world_h * 0.22)
                         enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
-                        
+
                         for _ in range(random.randint(3, 5)):
                             ex = door_x + random.randint(-20, 20)
                             ey = door_y + random.randint(-20, 20)
                             enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
-                            
+
                         if current_wave == max_waves and current_room in engine.critical_nodes and current_room != "TIP10TEMTT1":
                             enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
-    
+
                 # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
                 if current_wave == max_waves and not enemies:
                     if level_passed_timer == 0 and not level_passed_done:
                         level_passed_timer = 120 # 2 segundos
-                        
+
                     if level_passed_timer > 0:
                         level_passed_timer -= 1
                         if level_passed_timer == 0:
                             level_passed_done = True
                             engine.clean_room(current_room)
                             engine.update_unlocks()
-                            
+
                             # AUTOSAVE
                             save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
                             save_indicator_timer = 120
-                            
+
                             if current_room == "TIP10TEMTT1":
                                 global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
                                 save_mgr.save_global_save(global_data)
                                 bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]
-            
+
                                 trigger_transition("WIN", "FADE", 0.02)
                             else:
                                 trigger_transition("MAP", "CIRCLE", 0.04)
-                                
+
                 if combat_player.hp <= 0:
                     if level_failed_timer == 0 and not level_failed_done:
                         level_failed_timer = 120 # 2 segundos
-                        
+
                     if level_failed_timer > 0:
                         level_failed_timer -= 1
                         if level_failed_timer == 0:
                             level_failed_done = True
                             trigger_transition("MAP", "CIRCLE", 0.04)
-                
+
         # Dibujado
         screen.fill(BG_COLOR)
-        
+
         if game_state == "DISCLAIMER_SCREEN":
             disclaimer_screen.draw(screen)
         elif game_state == "TITLE_SCREEN":
@@ -701,19 +806,19 @@ def main():
         elif game_state == "MAP" or (game_state == "PAUSE" and previous_state == "MAP"):
             if MAP_BG_IMG:
                 screen.blit(MAP_BG_IMG, (0, 0))
-                
+
             map_gen.draw(screen, font_sm, camera_x, camera_y)
-            
+
             if selected_node and selected_node in map_gen.rooms:
                 sel_rect = map_gen.rooms[selected_node].rect.copy()
                 sel_rect.x += camera_x
                 sel_rect.y += camera_y
                 pygame.draw.rect(screen, (255, 255, 0), sel_rect, 4, border_radius=8)
-                
+
                 # Tooltip de Prerrequisitos
                 reqs = engine.subjects[selected_node]['reqs']
                 req_lines = [f"Materia: {engine.subjects[selected_node]['name']}", "Prerrequisitos:"]
-                
+
                 if selected_node == "TIP10TEMTT1":
                     cleaned_count = sum(1 for n in engine.nodes if engine.state[n] == NodeState.CLEANED)
                     total_req = len(engine.nodes) - 1
@@ -723,65 +828,65 @@ def main():
                 else:
                     for r in reqs:
                         req_lines.append(f"- {engine.subjects[r]['name']}")
-                
+
                 tt_surfaces = [font_sm.render(line, False, (255, 255, 255)) for line in req_lines]
                 tt_surfaces[0] = font_sm.render(req_lines[0], False, (255, 255, 100)) # Highlight name
-                
+
                 max_w = max(s.get_width() for s in tt_surfaces)
                 tt_h = sum(s.get_height() for s in tt_surfaces) + 10
                 tt_w = max_w + 20
-                
+
                 tt_x = sel_rect.right + 15
                 tt_y = sel_rect.top
                 if tt_x + tt_w > WIDTH: # No salir de la pantalla por la derecha
                     tt_x = sel_rect.left - tt_w - 15
-                    
+
                 tt_bg = pygame.Surface((tt_w, tt_h))
                 tt_bg.set_alpha(240)
                 tt_bg.fill((20, 20, 30))
                 screen.blit(tt_bg, (tt_x, tt_y))
                 pygame.draw.rect(screen, (100, 100, 150), (tt_x, tt_y, tt_w, tt_h), 2)
-                
+
                 cy = tt_y + 5
                 for s in tt_surfaces:
                     screen.blit(s, (tt_x + 10, cy))
                     cy += s.get_height()
-            
+
             # Capa de Interfaz (UI) panel de fondo
             hud_rect = pygame.Surface((WIDTH, 110))
             hud_rect.set_alpha(200)
             hud_rect.fill((10, 10, 10))
             screen.blit(hud_rect, (0, 0))
             pygame.draw.line(screen, (200, 200, 200), (0, 110), (WIDTH, 110), 2)
-            
+
             ui_text = [
                 f"MALLA CURRICULAR (MAPA DAG) | Semestre: {semester_counter} | Tiempo Record: {par_score}",
                 f"Energia: {energy}/{max_energy}",
                 "Mover: WASD | Disparar: Flechas/Mouse | Entrar: ENTER | Descansar: ESPACIO"
             ]
-            
+
             y_off = 15
             for line in ui_text:
                 ts = font_md.render(line, False, TEXT_COLOR)
                 screen.blit(ts, (15, y_off))
                 y_off += 30
-                
+
             # Animación de descanso
             if rest_animation_timer > 0:
                 rest_animation_timer -= 1
                 alpha = int((rest_animation_timer / 90) * 255)
-                
+
                 overlay = pygame.Surface((WIDTH, HEIGHT))
                 overlay.set_alpha(alpha // 3) # Capa semitransparente verde
                 overlay.fill((50, 200, 50))
                 screen.blit(overlay, (0, 0))
-                
+
                 # Textos flotantes
                 offset_y = (90 - rest_animation_timer) * 1.5 # Sube progresivamente
                 msg = font_lg.render("Zzz... DESCANSO COMPLETADO", True, (150, 255, 150))
                 msg.set_alpha(alpha)
                 screen.blit(msg, msg.get_rect(center=(WIDTH // 2, HEIGHT // 2 - offset_y)))
-                
+
                 msg2 = font_md.render("¡ENERGÍA RESTAURADA AL MÁXIMO!", True, (255, 255, 255))
                 msg2.set_alpha(alpha)
                 screen.blit(msg2, msg2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50 - offset_y)))
@@ -790,20 +895,23 @@ def main():
                 map_message_timer -= 1
                 msg_surf = font_md.render(map_message, True, (255, 100, 100))
                 msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT - 50))
-                
+
                 # Dark background
                 bg_rect = msg_rect.inflate(20, 10)
                 s = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
                 s.fill((0, 0, 0, 180))
                 screen.blit(s, bg_rect.topleft)
                 screen.blit(msg_surf, msg_rect)
-                
+
         elif game_state == "COMBAT" or (game_state == "PAUSE" and previous_state == "COMBAT"):
             draw_floor(screen, combat_bg_img, combat_cam_x, combat_cam_y)
+            for e in enemies:
+                if hasattr(e, "draw_area_ground_effects"):
+                    e.draw_area_ground_effects(screen, combat_cam_x, combat_cam_y)
             combat_player.draw(screen, combat_cam_x, combat_cam_y)
             for e in enemies:
                 e.draw(screen, combat_cam_x, combat_cam_y)
-                
+
             # Dibujar textos flotantes de daño
             for ft in floating_texts:
                 alpha = min(255, int((ft["life"] / 40.0) * 255))
@@ -837,7 +945,7 @@ def main():
                     font=font_sm,
                     show_names=debug_collision_labels,
                 )
-                
+
                 p_rect = combat_player.rect.move(combat_cam_x, combat_cam_y)
                 p_hit = combat_player.last_collision.get("x") or combat_player.last_collision.get("y")
                 pygame.draw.rect(screen, (255, 80, 80) if p_hit else (0, 255, 255), p_rect, 2)
@@ -860,19 +968,19 @@ def main():
                         screen.blit(bg, (12, info_y))
                         screen.blit(text_surf, (17, info_y + 3))
                         info_y += text_surf.get_height() + 8
-                
+
             # UI de Combate - Panel superior
             hud_rect = pygame.Surface((WIDTH, 60))
             hud_rect.set_alpha(180)
             hud_rect.fill((10, 10, 10))
             screen.blit(hud_rect, (0, 0))
             pygame.draw.line(screen, (150, 150, 150), (0, 60), (WIDTH, 60), 2)
-            
+
             # Dibujar barra de vida gráfica del jugador (Top-Left)
             if HEART_FRAMES and len(HEART_FRAMES) == 5:
                 max_hearts = 7
                 hp_per_heart = combat_player.max_hp / max_hearts
-                
+
                 # Suavizar la animación de pérdida de vida
                 if not hasattr(combat_player, 'display_hp'):
                     combat_player.display_hp = combat_player.hp
@@ -880,9 +988,9 @@ def main():
                     combat_player.display_hp -= 2.0  # Animación rápida
                 elif combat_player.display_hp < combat_player.hp:
                     combat_player.display_hp = combat_player.hp
-                
+
                 current_hp = combat_player.display_hp
-                
+
                 bar_x = 15
                 bar_y = 15
                 for i in range(max_hearts):
@@ -891,22 +999,22 @@ def main():
                     fraction = heart_hp / hp_per_heart
                     frame_idx = int(round(fraction * 4)) # 0 a 4 (5 fotogramas)
                     frame_idx = max(0, min(4, frame_idx))
-                    
+
                     screen.blit(HEART_FRAMES[frame_idx], (bar_x + i * 32, bar_y)) # Separación ajustada (32px)
             else:
                 hp_text = font_md.render("Vida:", False, (255, 255, 255))
                 screen.blit(hp_text, (15, 15))
-                
+
                 bar_x = 15 + hp_text.get_width() + 10
                 bar_y = 18
                 bar_w = 200
                 bar_h = 24
-                
+
                 hp_ratio = max(0, combat_player.hp / combat_player.max_hp)
                 pygame.draw.rect(screen, (80, 20, 20), (bar_x, bar_y, bar_w, bar_h)) # Fondo de la barra
                 pygame.draw.rect(screen, (255, 50, 50), (bar_x, bar_y, bar_w * hp_ratio, bar_h)) # Relleno de vida
                 pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 2) # Borde de la barra
-                
+
                 # Texto de vida numérico
                 hp_num = font_sm.render(f"{max(0, int(combat_player.hp))}/{combat_player.max_hp}", False, (255, 255, 255))
                 screen.blit(hp_num, (bar_x + bar_w//2 - hp_num.get_width()//2, bar_y + 2))
@@ -915,15 +1023,15 @@ def main():
             room_name = engine.subjects[current_room]['name']
             title = f"Limpiando: {room_name}"
             title_color = (255, 255, 255)
-            
+
             if current_room in engine.critical_nodes:
                 title += " [CAMINO CRITICO]"
                 title_color = engine.node_colors.get(current_room, (255, 100, 100))
-                
+
             room_ts = font_md.render(title, False, title_color)
             # Alineado a la derecha para no chocar con la barra de vida
             screen.blit(room_ts, (WIDTH - room_ts.get_width() - 20, 15))
-            
+
             if current_wave == max_waves and not enemies and level_passed_timer > 0:
                 msg_surf = font_lg.render("¡NIVEL SUPERADO!", True, (100, 255, 100))
                 msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT // 3))
@@ -931,7 +1039,7 @@ def main():
                 shadow_surf = font_lg.render("¡NIVEL SUPERADO!", True, (0, 50, 0))
                 screen.blit(shadow_surf, (msg_rect.x + 3, msg_rect.y + 3))
                 screen.blit(msg_surf, msg_rect)
-                
+
             if combat_player.hp <= 0 and level_failed_timer > 0:
                 msg_surf = font_lg.render("¡HAS SIDO DERROTADO!", True, (255, 100, 100))
                 msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT // 3))
@@ -939,28 +1047,60 @@ def main():
                 shadow_surf = font_lg.render("¡HAS SIDO DERROTADO!", True, (50, 0, 0))
                 screen.blit(shadow_surf, (msg_rect.x + 3, msg_rect.y + 3))
                 screen.blit(msg_surf, msg_rect)
-            
+
         elif game_state == "WIN":
             if event.type == pygame.KEYDOWN:
                 save_mgr.delete_save(current_slot)
                 main_menu.notification = "¡Nuevo enemigo desbloqueado! La experiencia es rejugable."
                 main_menu.notification_timer = 300
                 trigger_transition("MAIN_MENU", "FADE", 0.05)
-                
-            win_ts = font_lg.render(f"¡PROYECTO DE TITULACION APROBADO! ¡HAS GANADO!", False, (0, 255, 0))
-            stat_ts = font_md.render(f"Te tomo {semester_counter} Semestres. (El record ideal era {par_score})", False, TEXT_COLOR)
-            restart_ts = font_md.render("Presiona cualquier tecla para regresar al menu.", False, TEXT_COLOR)
-            
-            screen.blit(win_ts, (WIDTH//2 - win_ts.get_width()//2, HEIGHT//2 - 50))
-            screen.blit(stat_ts, (WIDTH//2 - stat_ts.get_width()//2, HEIGHT//2))
-            screen.blit(restart_ts, (WIDTH//2 - restart_ts.get_width()//2, HEIGHT//2 + 50))
-            
-        elif game_state == "GAME_OVER":
-            go_ts = font_lg.render("TE HAS QUEDADO SIN ENERGIA.", False, (255, 0, 0))
-            restart_ts = font_md.render("Presiona 'R' para reintentar el nivel.", False, TEXT_COLOR)
-            screen.blit(go_ts, (WIDTH//2 - go_ts.get_width()//2, HEIGHT//2 - 50))
-            screen.blit(restart_ts, (WIDTH//2 - restart_ts.get_width()//2, HEIGHT//2 + 50))
 
+            draw_centered_text_fit(
+                screen,
+                f"¡PROYECTO DE TITULACION APROBADO! ¡HAS GANADO!",
+                font_lg,
+                (WIDTH // 2, HEIGHT // 2 - 60),
+                (0, 255, 0),
+                WIDTH - 80,
+                antialias=False,
+            )
+            draw_centered_text_fit(
+                screen,
+                f"Te tomo {semester_counter} Semestres. (El record ideal era {par_score})",
+                font_md,
+                (WIDTH // 2, HEIGHT // 2),
+                TEXT_COLOR,
+                WIDTH - 100,
+                antialias=False,
+            )
+            draw_centered_text_fit(
+                screen,
+                "Presiona cualquier tecla para regresar al menu.",
+                font_md,
+                (WIDTH // 2, HEIGHT // 2 + 50),
+                TEXT_COLOR,
+                WIDTH - 100,
+                antialias=False,
+            )
+        elif game_state == "GAME_OVER":
+            draw_centered_text_fit(
+                screen,
+                "TE HAS QUEDADO SIN ENERGIA.",
+                font_lg,
+                (WIDTH // 2, HEIGHT // 2 - 50),
+                (255, 0, 0),
+                WIDTH - 80,
+                antialias=False,
+            )
+            draw_centered_text_fit(
+                screen,
+                "Presiona 'R' para reintentar el nivel.",
+                font_md,
+                (WIDTH // 2, HEIGHT // 2 + 50),
+                TEXT_COLOR,
+                WIDTH - 100,
+                antialias=False,
+            )
         if game_state == "PAUSE":
             pause_menu.draw(screen)
 
@@ -971,7 +1111,7 @@ def main():
             s = pygame.Surface((180, 50), pygame.SRCALPHA)
             s.fill((0, 0, 0, 100)) # Alpha mucho más transparente (antes 200)
             screen.blit(s, (WIDTH - 200, HEIGHT - 70))
-            
+
             # Círculo e icono (tamaño intermedio)
             icon_x, icon_y = WIDTH - 170, HEIGHT - 45
             if SAVE_ICON_IMG:
@@ -985,24 +1125,23 @@ def main():
                 pygame.draw.circle(screen, (100, 255, 100), (icon_x, icon_y), 17, 3)
                 arc_angle = (save_indicator_timer * 12) % 360
                 pygame.draw.arc(screen, (255, 255, 255), (icon_x - 17, icon_y - 17, 34, 34), math.radians(arc_angle), math.radians(arc_angle+100), 4)
-            
+
             # Texto
             s_text = font_sm.render("Guardando...", True, (255, 255, 255))
             screen.blit(s_text, (icon_x + 25, icon_y - s_text.get_height()//2))
-            
+
         if trans_state["active"]:
             trans_state["progress"] += trans_state["speed"]
             if trans_state["progress"] >= 1.0:
                 trans_state["progress"] = 1.0
                 trans_state["active"] = False
-            
+
             # Dibujamos encima del 'screen' que ya tiene el nuevo estado
             render_transition(screen, trans_state["old_surf"], screen.copy(), trans_state["type"], trans_state["progress"], WIDTH, HEIGHT)
 
-        # Escalado final: estirar la superficie interna a la ventana real
-        scaled_surf = pygame.transform.scale(screen, real_screen.get_size())
-        real_screen.blit(scaled_surf, (0, 0))
-        
+        # Escalado final: mantiene 16:9 sin deformar; fit usa barras y fill recorta.
+        present_virtual_surface(screen, real_screen, aspect_mode)
+
         pygame.display.flip()
         clock.tick(60)
 

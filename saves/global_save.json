@@ -1,11 +1,17 @@
 {
     "bestiary_unlocks": [
-        "EL RELOJ (DEADLINE)",
-        "MEGA BOSS (TITULACION)",
-        "CODIGO SPAGHETTI",
         "MEMORY LEAK",
+        "CODIGO SPAGHETTI",
+        "MEGA BOSS (TITULACION)",
+        "EL RELOJ (DEADLINE)",
         "BUG"
     ],
-    "volume": 0.5,
-    "resolution": 0
+    "volume": 50.5,
+    "resolution": [
+        1920,
+        1080
+    ],
+    "tutorial_completed": true,
+    "fullscreen": true,
+    "aspect_mode": "fit"
 }

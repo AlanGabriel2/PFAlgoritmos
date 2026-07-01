@@ -19,7 +19,10 @@ def load_global_save():
     return {
         "bestiary_unlocks": ["BUG", "CODIGO SPAGHETTI", "MEMORY LEAK", "EL RELOJ (DEADLINE)"],
         "volume": 0.5,
-        "resolution": 0 # 0=1280x720, 1=Full Screen
+        "resolution": [1280, 720],
+        "fullscreen": True,
+        "aspect_mode": "fit",
+        "tutorial_completed": False
     }
 
 def save_global_save(data):

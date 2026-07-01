@@ -1207,5 +1207,5 @@
             "enabled": true
         }
     ],
-    "pathfinding_cell_size": 48
+    "pathfinding_cell_size": 24
 }

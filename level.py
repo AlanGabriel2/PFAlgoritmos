@@ -21,7 +21,7 @@ def resolve_asset_path(path_value):
     return BASE_DIR / path
 
 
-def get_image_size(path_value, fallback_size=(1024, 768)):
+def get_image_size(path_value, fallback_size=(1280, 720)):
     try:
         image = pygame.image.load(str(resolve_asset_path(path_value)))
         return image.get_size()
@@ -63,15 +63,15 @@ class Level:
     walkable_zones: list = field(default_factory=list)
     walkable_metadata: list = field(default_factory=list)
     character_scale: float = 1.0
-    pathfinding_cell_size: int = 48
+    pathfinding_cell_size: int = 24
 
     @classmethod
-    def from_dict(cls, data, fallback_size=(1024, 768)):
+    def from_dict(cls, data, fallback_size=(1280, 720)):
         background = data.get("background", "")
         size = tuple(data.get("size") or get_image_size(background, fallback_size))
         player_spawn = tuple(data.get("player_spawn", (size[0] // 2, size[1] // 2)))
         character_scale = float(data.get("character_scale", 0.7))
-        pathfinding_cell_size = int(data.get("pathfinding_cell_size", 48))
+        pathfinding_cell_size = int(data.get("pathfinding_cell_size", 24))
 
         colliders = []
         collider_metadata = []
@@ -251,7 +251,7 @@ def resolve_level_path(level_name_or_path):
     return BASE_DIR / path
 
 
-def load_level(level_name_or_path, fallback_size=(1024, 768)):
+def load_level(level_name_or_path, fallback_size=(1280, 720)):
     path = resolve_level_path(level_name_or_path)
     if not path.exists():
         return build_default_combat_level(fallback_size)
@@ -260,7 +260,7 @@ def load_level(level_name_or_path, fallback_size=(1024, 768)):
         return Level.from_dict(json.load(f), fallback_size=fallback_size)
 
 
-def load_combat_level(room_id=None, fallback_size=(1024, 768)):
+def load_combat_level(room_id=None, fallback_size=(1280, 720)):
     candidates = []
     if room_id:
         candidates.append(room_id)
@@ -276,14 +276,14 @@ def load_combat_level(room_id=None, fallback_size=(1024, 768)):
     return build_default_combat_level(fallback_size)
 
 
-def build_default_combat_level(size=(1024, 768)):
+def build_default_combat_level(size=(1280, 720)):
     width, height = size
     data = {
         "name": DEFAULT_COMBAT_LEVEL,
         "background": "assets/images/backgrounds/floor_tile.png",
         "size": [width, height],
         "player_spawn": [width // 2, height // 2],
-        "pathfinding_cell_size": 48,
+        "pathfinding_cell_size": 24,
         "enemy_spawns": [
             [width // 2, 120],
             [width // 2, height - 120],
