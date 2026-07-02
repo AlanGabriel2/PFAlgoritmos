@@ -10,7 +10,8 @@ class Animator:
         
         self.current_row = 0
         self.current_frame = 0.0
-        
+        self._last_update_ms = None
+
         cache_key = (spritesheet_path, frame_width, frame_height, rows, cols, transpose)
         if cache_key in _animation_cache:
             self.frames = _animation_cache[cache_key]
@@ -75,12 +76,26 @@ class Animator:
             self.current_frame = 0.0
 
     def update(self):
+        # Avance basado en tiempo real: la velocidad de animacion es independiente
+        # del FPS de render. A 60 FPS coincide exactamente con el comportamiento previo
+        # (animation_speed = cuadros de sprite por tick de 60 Hz).
+        now = pygame.time.get_ticks()
+        if self._last_update_ms is None:
+            self._last_update_ms = now
+        dt_ms = now - self._last_update_ms
+        self._last_update_ms = now
+        # Limitar dt para evitar saltos grandes tras una pausa o perdida de foco.
+        if dt_ms < 0:
+            dt_ms = 0
+        elif dt_ms > 100:
+            dt_ms = 100
+
         if self.current_row in self.frames:
             num_frames = len(self.frames[self.current_row])
             if num_frames > 0:
-                self.current_frame += self.animation_speed
+                self.current_frame += self.animation_speed * (dt_ms / (1000.0 / 60.0))
                 if self.current_frame >= num_frames:
-                    self.current_frame = 0.0
+                    self.current_frame %= num_frames
 
     def get_current_image(self):
         if self.current_row in self.frames and len(self.frames[self.current_row]) > 0:

@@ -21,6 +21,26 @@ pygame.init()
 # Configurar Pantalla
 WIDTH, HEIGHT = 1280, 720
 
+# --- Limite de FPS (independiente de la resolucion, el aspecto y el escalado) ---
+# La logica del juego SIEMPRE simula a 60 Hz (fixed timestep); el limite de FPS solo
+# controla la frecuencia de RENDER. Asi el juego nunca se acelera ni se ralentiza.
+FIXED_FPS = 60
+FIXED_DT_MS = 1000.0 / FIXED_FPS
+MAX_SIM_STEPS = 5  # Tope de pasos de simulacion por frame (evita "spiral of death").
+VALID_FPS_LIMITS = [30, 60, 120, 144, 165, 240, "unlimited"]
+DEFAULT_FPS_LIMIT = 60
+
+
+def sanitize_fps_limit(value):
+    """Devuelve un limite de FPS valido de VALID_FPS_LIMITS; si es invalido, 60."""
+    if value == "unlimited":
+        return "unlimited"
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_FPS_LIMIT
+    return ivalue if ivalue in VALID_FPS_LIMITS else DEFAULT_FPS_LIMIT
+
 
 def get_saved_display_mode():
     data = save_manager.load_global_save()
@@ -29,17 +49,62 @@ def get_saved_display_mode():
         resolution = (int(saved_res[0]), int(saved_res[1]))
     else:
         resolution = (WIDTH, HEIGHT)
-    flags = pygame.FULLSCREEN if data.get("fullscreen", True) else 0
-    return resolution, flags
+    fullscreen = bool(data.get("fullscreen", True))
+    return resolution, fullscreen
+
+
+def get_desktop_size():
+    """Tamaño real del escritorio del monitor principal (sin depender del modo actual)."""
+    try:
+        return pygame.display.get_desktop_sizes()[0]
+    except Exception:
+        info = pygame.display.Info()
+        return info.current_w, info.current_h
+
+
+def apply_display_mode(resolution, fullscreen):
+    """Crea/recrea la ventana real de forma robusta y devuelve la superficie.
+
+    La lógica del juego siempre se dibuja sobre la superficie virtual de 1280x720
+    y luego se escala con letterbox en present_virtual_surface(), por lo que la
+    resolución elegida nunca deforma ni corta el contenido: solo define el tamaño
+    real del framebuffer sobre el que se aplica el letterbox 16:9.
+
+    - Pantalla completa: usa el flag SCALED para que SDL escale la resolución lógica
+      pedida a la pantalla física SIN cambiar el modo de video del hardware. Esto es
+      clave: muchos monitores no soportan modos exclusivos distintos al nativo y, al
+      pedírselos, devuelven una superficie basura (p. ej. 800x600) que corta el
+      contenido. Con SCALED get_size() siempre coincide con la resolución pedida.
+    - Ventana: limita la resolución pedida al área útil del escritorio (descontando
+      barra de título y barra de tareas) para que la ventana no quede fuera de pantalla.
+    """
+    req_w = int(resolution[0]) if resolution else WIDTH
+    req_h = int(resolution[1]) if resolution else HEIGHT
+
+    if fullscreen:
+        try:
+            return pygame.display.set_mode((req_w, req_h), pygame.FULLSCREEN | pygame.SCALED)
+        except pygame.error:
+            try:
+                return pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            except pygame.error:
+                return pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
+
+    desktop_w, desktop_h = get_desktop_size()
+    # Margen para barra de título (~40 px) y barra de tareas (~60 px).
+    max_w = max(640, desktop_w - 20)
+    max_h = max(360, desktop_h - 80)
+    win_w = min(req_w, max_w)
+    win_h = min(req_h, max_h)
+    try:
+        return pygame.display.set_mode((win_w, win_h), 0)
+    except pygame.error:
+        return pygame.display.set_mode((WIDTH, HEIGHT), 0)
 
 
 # Crear la ventana real y la superficie virtual para el juego
-_initial_resolution, _initial_flags = get_saved_display_mode()
-try:
-    real_screen = pygame.display.set_mode(_initial_resolution, _initial_flags)
-except pygame.error:
-    fallback_resolution = (0, 0) if _initial_flags & pygame.FULLSCREEN else (WIDTH, HEIGHT)
-    real_screen = pygame.display.set_mode(fallback_resolution, _initial_flags)
+_initial_resolution, _initial_fullscreen = get_saved_display_mode()
+real_screen = apply_display_mode(_initial_resolution, _initial_fullscreen)
 screen = pygame.Surface((WIDTH, HEIGHT))
 pygame.display.set_caption("Mega-Calabozo DAG")
 
@@ -176,6 +241,206 @@ def present_virtual_surface(virtual_surface, target_surface, aspect_mode="fit"):
     target_surface.blit(scaled_surface, (offset_x, offset_y))
 
 
+# ============================================================================
+# Estilo visual del Mapa Curricular y su HUD.
+# NOTA: esto es SOLO presentacion/render. No cambia posiciones de nodos,
+# aristas, hitboxes ni ninguna logica del mapa.
+# ============================================================================
+MAP_UI = {
+    "panel_top": (36, 31, 48),
+    "panel_bot": (18, 15, 26),
+    "edge_dark": (10, 8, 16),
+    "edge_light": (120, 104, 150),
+    "accent": (255, 208, 120),
+    "text": (238, 233, 248),
+    "text_dim": (170, 162, 188),
+    "divider": (74, 66, 96),
+}
+
+_map_overlay_cache = None
+
+
+def build_map_overlay(width, height):
+    """Viñeteado + degradado ambiental SUAVE (se cachea una vez). No oscurece de mas."""
+    overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+    vy = int(height * 0.22)
+    for i in range(vy):
+        a = int(76 * (1 - i / vy))
+        pygame.draw.line(overlay, (0, 0, 12, a), (0, i), (width, i))
+        pygame.draw.line(overlay, (0, 0, 12, a), (0, height - 1 - i), (width, height - 1 - i))
+    vx = int(width * 0.13)
+    for i in range(vx):
+        a = int(52 * (1 - i / vx))
+        pygame.draw.line(overlay, (0, 0, 12, a), (i, 0), (i, height))
+        pygame.draw.line(overlay, (0, 0, 12, a), (width - 1 - i, 0), (width - 1 - i, height))
+    return overlay
+
+
+def get_map_overlay():
+    global _map_overlay_cache
+    if _map_overlay_cache is None:
+        _map_overlay_cache = build_map_overlay(WIDTH, HEIGHT)
+    return _map_overlay_cache
+
+
+def draw_pixel_panel(surface, rect, title_h=0, accent=None, fill=(30, 26, 42)):
+    """Panel pixel-art: relleno PLANO, bordes duros con bisel y remaches. Sin degradados."""
+    rect = pygame.Rect(rect)
+    outer = (8, 6, 12)
+    light = (78, 68, 100)
+    dark = (16, 12, 24)
+    # contorno exterior (2px) + relleno plano
+    pygame.draw.rect(surface, outer, rect)
+    inner = rect.inflate(-2, -2)
+    pygame.draw.rect(surface, fill, inner)
+    # bisel duro: claro arriba/izquierda, oscuro abajo/derecha
+    pygame.draw.line(surface, light, (inner.left, inner.top), (inner.right - 1, inner.top))
+    pygame.draw.line(surface, light, (inner.left, inner.top), (inner.left, inner.bottom - 1))
+    pygame.draw.line(surface, dark, (inner.left, inner.bottom - 1), (inner.right - 1, inner.bottom - 1))
+    pygame.draw.line(surface, dark, (inner.right - 1, inner.top), (inner.right - 1, inner.bottom - 1))
+    # separador de titulo (linea hundida de 2px)
+    if title_h > 0:
+        ty = inner.top + title_h
+        pygame.draw.line(surface, dark, (inner.left + 2, ty), (inner.right - 3, ty))
+        pygame.draw.line(surface, light, (inner.left + 2, ty + 1), (inner.right - 3, ty + 1))
+    # remaches en las esquinas (bloques pixelados)
+    if accent:
+        for (ax, ay) in [(rect.left + 3, rect.top + 3), (rect.right - 6, rect.top + 3),
+                         (rect.left + 3, rect.bottom - 6), (rect.right - 6, rect.bottom - 6)]:
+            pygame.draw.rect(surface, accent, (ax, ay, 3, 3))
+            pygame.draw.rect(surface, dark, (ax, ay, 3, 3), 1)
+
+
+def draw_energy_crystal(surface, cx, cy, filled):
+    """Gema de energia PIXELADA (diamante escalonado). filled = energia disponible."""
+    px = 2
+    rows = [1, 3, 5, 7, 5, 3, 1]  # medio-ancho de cada fila (en unidades de pixel)
+    if filled:
+        body, hi = (86, 204, 250), (198, 240, 255)
+        edge = (14, 44, 70)
+    else:
+        body, hi = (58, 60, 80), None
+        edge = (34, 36, 50)
+    top = cy - (len(rows) // 2) * px
+    # contorno oscuro (una unidad mas ancho por lado)
+    for i, hw in enumerate(rows):
+        w = (hw + 1) * px
+        pygame.draw.rect(surface, edge, (cx - w // 2, top + i * px, w, px))
+    # cuerpo
+    for i, hw in enumerate(rows):
+        w = hw * px
+        pygame.draw.rect(surface, body, (cx - w // 2, top + i * px, w, px))
+    # brillo superior
+    if hi:
+        pygame.draw.rect(surface, hi, (cx - px, top + px, px, px))
+
+
+def draw_map_hud(surface, semester, par, energy, max_energy):
+    """HUD superior del mapa: barra plana pixel-art con bordes duros. Misma informacion."""
+    HUD_H = 104
+    # relleno plano en 2 tonos duros (sin degradado)
+    pygame.draw.rect(surface, (26, 22, 36), (0, 0, WIDTH, HUD_H))
+    pygame.draw.rect(surface, (20, 16, 28), (0, HUD_H - 24, WIDTH, 24))
+    pygame.draw.line(surface, (60, 52, 82), (0, 0), (WIDTH, 0))            # highlight superior 1px
+    # borde inferior duro: oscuro (4px) + acento (1px)
+    pygame.draw.rect(surface, (10, 8, 16), (0, HUD_H - 4, WIDTH, 4))
+    pygame.draw.line(surface, MAP_UI["accent"], (0, HUD_H - 5), (WIDTH, HUD_H - 5))
+
+    surface.blit(font_md.render("MALLA CURRICULAR", False, MAP_UI["accent"]), (24, 14))
+    surface.blit(font_sm.render("Mapa DAG - grafo de materias", False, MAP_UI["text_dim"]), (24, 46))
+
+    def stat(cx, label, value_str):
+        lab = font_sm.render(label, False, MAP_UI["text_dim"])
+        surface.blit(lab, lab.get_rect(center=(cx, 26)))
+        val = font_md.render(value_str, False, MAP_UI["text"])
+        surface.blit(val, val.get_rect(center=(cx, 50)))
+
+    # divisores duros (2px: oscuro + claro)
+    for dx in (690, 862):
+        pygame.draw.line(surface, (12, 10, 18), (dx, 16), (dx, 62))
+        pygame.draw.line(surface, (60, 52, 82), (dx + 1, 16), (dx + 1, 62))
+    stat(610, "SEMESTRE", str(semester))
+    stat(776, "TIEMPO RECORD", str(par))
+
+    # Energia como gemas pixeladas
+    lab = font_sm.render("ENERGIA", False, MAP_UI["text_dim"])
+    surface.blit(lab, lab.get_rect(center=(1040, 24)))
+    gap = 22
+    total = max(1, max_energy) * gap
+    sx = 1040 - total // 2 + gap // 2
+    for i in range(max_energy):
+        draw_energy_crystal(surface, sx + i * gap, 52, i < energy)
+
+    controls = "WASD Mover   -   Flechas/Mouse Disparar   -   ENTER Entrar   -   ESPACIO Descansar"
+    cs = font_sm.render(controls, False, MAP_UI["text_dim"])
+    surface.blit(cs, cs.get_rect(center=(WIDTH // 2, 84)))
+
+
+def draw_selection_highlight(surface, rect):
+    """Marco de seleccion pixel-art: contorno duro parpadeante + corner brackets chunky."""
+    blink = (math.sin(pygame.time.get_ticks() / 200.0) + 1) / 2.0
+    accent = MAP_UI["accent"]
+    col = accent if blink > 0.4 else (198, 162, 88)
+    frame = rect.inflate(6, 6)
+    # contorno duro (sin glow suave), casing oscuro + color, siguiendo el redondeo del nodo
+    pygame.draw.rect(surface, (14, 10, 4), frame.inflate(4, 4), 3, border_radius=10)
+    pygame.draw.rect(surface, col, frame, 3, border_radius=10)
+    # corner brackets chunky (lineas duras)
+    L, w = 12, 4
+    for (cx, cy, sx, sy) in [
+        (frame.left, frame.top, 1, 1),
+        (frame.right, frame.top, -1, 1),
+        (frame.left, frame.bottom, 1, -1),
+        (frame.right, frame.bottom, -1, -1),
+    ]:
+        pygame.draw.line(surface, accent, (cx, cy), (cx + sx * L, cy), w)
+        pygame.draw.line(surface, accent, (cx, cy), (cx, cy + sy * L), w)
+
+
+def draw_subject_tooltip(surface, engine, selected_node, sel_rect):
+    """Panel informativo de la materia (misma info y misma logica de posicion/volteo)."""
+    name = engine.subjects[selected_node]['name']
+    reqs = engine.subjects[selected_node]['reqs']
+    entries = []  # (texto, color)
+    if selected_node == "TIP10TEMTT1":
+        cleaned = sum(1 for n in engine.nodes if engine.state[n] == NodeState.CLEANED)
+        total = len(engine.nodes) - 1
+        entries.append((f"- Completar todas las materias ({cleaned}/{total})", MAP_UI["text"]))
+    elif not reqs:
+        entries.append(("- Ninguno", MAP_UI["text_dim"]))
+    else:
+        for r in reqs:
+            done = engine.state.get(r) == NodeState.CLEANED
+            col = (150, 220, 150) if done else (232, 178, 128)
+            entries.append((f"- {engine.subjects[r]['name']}", col))
+
+    title_surf = font_sm.render(name, False, MAP_UI["accent"])
+    header_surf = font_sm.render("Prerrequisitos:", False, MAP_UI["text_dim"])
+    entry_surfs = [font_sm.render(txt, False, c) for (txt, c) in entries]
+    line_h = font_sm.get_height()
+    pad = 12
+    title_h = line_h + 10
+    body = [header_surf] + entry_surfs
+    max_w = max([title_surf.get_width()] + [s.get_width() for s in body])
+    tt_w = max_w + pad * 2
+    tt_h = title_h + 6 + len(body) * line_h + pad
+
+    # Misma logica que antes: al lado derecho del nodo y se voltea si no cabe.
+    tt_x = sel_rect.right + 15
+    tt_y = sel_rect.top
+    if tt_x + tt_w > WIDTH:
+        tt_x = sel_rect.left - tt_w - 15
+    tt_x = max(8, tt_x)
+    tt_y = max(8, min(tt_y, HEIGHT - 8 - tt_h))
+
+    draw_pixel_panel(surface, (tt_x, tt_y, tt_w, tt_h), title_h=title_h, accent=MAP_UI["accent"])
+    surface.blit(title_surf, (tt_x + pad, tt_y + 6))
+    cy = tt_y + title_h + 5
+    for s in body:
+        surface.blit(s, (tt_x + pad, cy))
+        cy += line_h
+
+
 def main():
     save_mgr = save_manager
     global_data = save_mgr.load_global_save()
@@ -209,6 +474,7 @@ def main():
     aspect_mode = global_data.get("aspect_mode", "fit")
     if aspect_mode not in ("fit", "fill"):
         aspect_mode = "fit"
+    fps_limit = sanitize_fps_limit(global_data.get("fps_limit", DEFAULT_FPS_LIMIT))
     previous_state = None
     options_return_state = "MAIN_MENU"
 
@@ -217,6 +483,38 @@ def main():
     dragging = False
     last_mouse_pos = (0, 0)
     selected_node = None
+
+    def clamp_map_camera(cx, cy):
+        """Limita el desplazamiento de la cámara para no arrastrar el mapa al vacío.
+
+        Solo afecta a la cámara (offset de dibujo); no cambia posiciones de nodos,
+        aristas ni hitboxes. Se permite un margen para poder ver los bordes del mapa
+        con algo de aire, pero no desplazarse indefinidamente.
+        """
+        rooms = map_gen.rooms
+        if not rooms:
+            return cx, cy
+        min_x = min(r.rect.left for r in rooms.values())
+        max_x = max(r.rect.right for r in rooms.values())
+        min_y = min(r.rect.top for r in rooms.values())
+        max_y = max(r.rect.bottom for r in rooms.values())
+        pad = 80  # aire permitido más allá de los bordes del mapa (pequeño)
+
+        # Eje X: si el mapa cabe en el viewport se mantiene casi centrado; si es más
+        # grande, la cámara se limita para que el mapa siempre cubra la pantalla + pad.
+        if (max_x - min_x) <= WIDTH:
+            center_cx = (WIDTH - (min_x + max_x)) / 2
+            cx_min, cx_max = center_cx - pad, center_cx + pad
+        else:
+            cx_min, cx_max = WIDTH - max_x - pad, -min_x + pad
+
+        if (max_y - min_y) <= HEIGHT:
+            center_cy = (HEIGHT - (min_y + max_y)) / 2
+            cy_min, cy_max = center_cy - pad, center_cy + pad
+        else:
+            cy_min, cy_max = HEIGHT - max_y - pad, -min_y + pad
+
+        return max(cx_min, min(cx_max, cx)), max(cy_min, min(cy_max, cy))
 
     current_room = None
     combat_player = None
@@ -373,8 +671,25 @@ def main():
     level_passed_done = False
     level_failed_timer = 0
     level_failed_done = False
+    sim_accumulator = 0.0
     running = True
     while running:
+        # Ritmo de RENDER segun el limite de FPS elegido (independiente de la resolucion).
+        # "unlimited" -> tick(0): no limita. Devuelve los ms reales transcurridos.
+        frame_ms = clock.tick(0 if fps_limit == "unlimited" else fps_limit)
+
+        # Simulacion a PASO FIJO de 60 Hz desacoplada del render: acumulamos el tiempo
+        # real y ejecutamos la logica en pasos de 1/60 s. Asi el juego corre a la misma
+        # velocidad a 30, 60, 120, 144, 240 FPS o sin limite.
+        sim_accumulator += frame_ms
+        max_accumulated = FIXED_DT_MS * MAX_SIM_STEPS
+        if sim_accumulator > max_accumulated:
+            sim_accumulator = max_accumulated  # descartar tiempo tras un tiron/pausa
+        sim_steps = int(sim_accumulator / FIXED_DT_MS)
+        sim_accumulator -= sim_steps * FIXED_DT_MS
+        # Factor para efectos de RENDER dependientes del tiempo (transiciones): 1.0 a 60 FPS.
+        render_scale = min(frame_ms / FIXED_DT_MS, float(MAX_SIM_STEPS))
+
         # Convertir coordenadas del raton real a la superficie virtual 16:9.
         raw_mx, raw_my = pygame.mouse.get_pos()
         mouse_x, mouse_y = window_to_virtual((raw_mx, raw_my), real_screen.get_size(), aspect_mode)
@@ -389,6 +704,7 @@ def main():
                 if selected_node in map_gen.rooms:
                     camera_x = WIDTH//2 - map_gen.rooms[selected_node].rect.centerx
                     camera_y = HEIGHT//2 - map_gen.rooms[selected_node].rect.centery
+                    camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -434,6 +750,7 @@ def main():
                         max_energy = data["max_energy"]
                         camera_x = data["camera_x"]
                         camera_y = data["camera_y"]
+                        camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
                         engine.state = data["nodes_state"]
                         trigger_transition("MAP", "CIRCLE", 0.04)
                     else:
@@ -482,6 +799,7 @@ def main():
                             max_energy = data["max_energy"]
                             camera_x = data["camera_x"]
                             camera_y = data["camera_y"]
+                            camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
                             engine.state = data["nodes_state"]
                             trigger_transition("MAP", "CIRCLE", 0.04)
             elif game_state == "PAUSE":
@@ -491,6 +809,9 @@ def main():
                 elif action == "Opciones":
                     options_return_state = "PAUSE"
                     trigger_transition("OPTIONS", "SLIDE_LEFT", 0.05)
+                elif action == "Guardar y regresar al mapa":
+                    save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
+                    trigger_transition("MAP", "CIRCLE", 0.04)
                 elif action == "Guardar y Salir al menú principal":
                     save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
                     trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
@@ -522,24 +843,24 @@ def main():
                         fullscreen = action["fullscreen"]
                         gen_vol = action["gen_vol"]
                         aspect_mode = action.get("aspect_mode", aspect_mode)
+                        fps_limit = sanitize_fps_limit(action.get("fps_limit", fps_limit))
 
                         global_data["resolution"] = res
                         global_data["fullscreen"] = fullscreen
                         global_data["aspect_mode"] = aspect_mode
                         global_data["volume"] = gen_vol
+                        global_data["music_volume"] = action.get("mus_vol", global_data.get("music_volume", 100))
+                        global_data["fps_limit"] = fps_limit
                         save_mgr.save_global_save(global_data)
 
-                        flags = pygame.FULLSCREEN if fullscreen else 0
-                        try:
-                            real_screen = pygame.display.set_mode(res, flags)
-                        except pygame.error:
-                            fallback_res = (0, 0) if fullscreen else (WIDTH, HEIGHT)
-                            real_screen = pygame.display.set_mode(fallback_res, flags)
-                        # La logica interna se mantiene en 1280x720; la ventana solo cambia el escalado final.
+                        # La ventana se recrea de forma robusta; la logica interna se
+                        # mantiene en 1280x720 y solo cambia el escalado final (letterbox).
+                        real_screen = apply_display_mode(res, fullscreen)
                         trigger_transition(options_return_state, "SLIDE_RIGHT" if options_return_state == "MAIN_MENU" else "FADE", 0.05)
             elif game_state == "MAP":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     previous_state = "MAP"
+                    pause_menu.set_context(in_combat=False)
                     trigger_transition("PAUSE", "FADE", 0.08)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 3: # Clic derecho para arrastrar
@@ -572,6 +893,7 @@ def main():
                         dx, dy = event.pos[0] - last_mouse_pos[0], event.pos[1] - last_mouse_pos[1]
                         camera_x += dx
                         camera_y += dy
+                        camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
                         last_mouse_pos = event.pos
 
                 elif event.type == pygame.KEYDOWN:
@@ -614,6 +936,7 @@ def main():
                                 target_room = map_gen.rooms[selected_node]
                                 camera_x = WIDTH//2 - target_room.rect.centerx
                                 camera_y = HEIGHT//2 - target_room.rect.centery
+                                camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
 
             elif game_state == "COMBAT":
                 if editor_mode:
@@ -633,6 +956,7 @@ def main():
                     continue
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     previous_state = "COMBAT"
+                    pause_menu.set_context(in_combat=True)
                     trigger_transition("PAUSE", "FADE", 0.08)
                 # Disparar con el ratón
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -642,149 +966,160 @@ def main():
                     main()
                     return
 
-        # Actualizaciones Continuas (teclas presionadas)
-        if game_state == "DISCLAIMER_SCREEN":
-            if disclaimer_screen.time > 200 and not trans_state["active"]:
-                trigger_transition("TITLE_SCREEN", "FADE", 0.03)
-        elif game_state == "TUTORIAL":
-            tutorial_action = tutorial_state.update(keys, WIDTH, HEIGHT, mouse_x, mouse_y)
-            if tutorial_action == "FINISH_TUTORIAL":
-                finish_tutorial()
-        elif game_state == "COMBAT":
-            world_w, world_h = combat_world_size()
-            if not editor_mode:
-                # Disparar con flechas (soporta diagonales)
-                dx, dy = 0, 0
-                if keys[pygame.K_UP]: dy -= 1
-                if keys[pygame.K_DOWN]: dy += 1
-                if keys[pygame.K_LEFT]: dx -= 1
-                if keys[pygame.K_RIGHT]: dx += 1
+        # Simulacion a PASO FIJO (60 Hz): se ejecuta 0, 1 o varias veces por frame de
+        # render segun sim_steps, manteniendo la velocidad del juego constante a cualquier FPS.
+        for _ in range(sim_steps):
+            # Actualizaciones Continuas (teclas presionadas)
+            if game_state == "DISCLAIMER_SCREEN":
+                if disclaimer_screen.time > 200 and not trans_state["active"]:
+                    trigger_transition("TITLE_SCREEN", "FADE", 0.03)
+            elif game_state == "TUTORIAL":
+                tutorial_action = tutorial_state.update(keys, WIDTH, HEIGHT, mouse_x, mouse_y)
+                if tutorial_action == "FINISH_TUTORIAL":
+                    finish_tutorial()
+            elif game_state == "COMBAT":
+                world_w, world_h = combat_world_size()
+                if not editor_mode:
+                    # Disparar con flechas (soporta diagonales)
+                    dx, dy = 0, 0
+                    if keys[pygame.K_UP]: dy -= 1
+                    if keys[pygame.K_DOWN]: dy += 1
+                    if keys[pygame.K_LEFT]: dx -= 1
+                    if keys[pygame.K_RIGHT]: dx += 1
 
-                if dx != 0 or dy != 0:
-                    combat_player.shoot_angle(math.atan2(dy, dx))
+                    if dx != 0 or dy != 0:
+                        combat_player.shoot_angle(math.atan2(dy, dx))
 
-                # Mouse drag shooting
-                if pygame.mouse.get_pressed()[0]:
-                    combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
+                    # Mouse drag shooting
+                    if pygame.mouse.get_pressed()[0]:
+                        combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
 
-                combat_player.move(keys, world_w, world_h, collision_manager)
-                combat_player.update_bullets(world_w, world_h)
+                    combat_player.move(keys, world_w, world_h, collision_manager)
+                    combat_player.update_bullets(world_w, world_h)
 
-                update_combat_camera(smooth=True)
+                    update_combat_camera(smooth=True)
 
-                for enemy in enemies:
-                    enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager, pathfinder=pathfinder, nearby_enemies=enemies)
+                    for enemy in enemies:
+                        enemy.update(combat_player.x, combat_player.y, world_w, world_h, collision_manager, pathfinder=pathfinder, nearby_enemies=enemies)
 
-                    if isinstance(enemy, MiniBoss):
-                        bestiary_menu.unlock("MINI BOSS (PARCIAL)")
-                    elif isinstance(enemy, Boss):
-                        bestiary_menu.unlock("MEGA BOSS (TITULACIÓN)")
+                        if isinstance(enemy, MiniBoss):
+                            bestiary_menu.unlock("MINI BOSS (PARCIAL)")
+                        elif isinstance(enemy, Boss):
+                            bestiary_menu.unlock("MEGA BOSS (TITULACIÓN)")
 
-                    # El jugador recibe daño por contacto
-                    if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
-                        combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
-                        enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
+                        # El jugador recibe daño por contacto
+                        if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
+                            combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
+                            enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
 
-                    # El jugador recibe daño por balas enemigas
-                    for b in enemy.bullets[:]:
-                        dist = math.hypot(combat_player.x - b.x, combat_player.y - b.y)
-                        if dist < (combat_player.radius + b.radius):
-                            combat_player.hp -= 15
-                            if b in enemy.bullets:
-                                enemy.bullets.remove(b)
+                        # El jugador recibe daño por balas enemigas
+                        for b in enemy.bullets[:]:
+                            dist = math.hypot(combat_player.x - b.x, combat_player.y - b.y)
+                            if dist < (combat_player.radius + b.radius):
+                                combat_player.hp -= 15
+                                if b in enemy.bullets:
+                                    enemy.bullets.remove(b)
 
-                    if hasattr(enemy, "collect_area_damage_events"):
-                        for hit in enemy.collect_area_damage_events(combat_player):
-                            combat_player.hp -= hit["damage"]
-                            floating_texts.append({
-                                "text": str(hit["damage"]),
-                                "x": hit["x"],
-                                "y": hit["y"] - 35,
-                                "life": 45,
-                                "color": (255, 125, 45)
-                            })
+                        if hasattr(enemy, "collect_area_damage_events"):
+                            for hit in enemy.collect_area_damage_events(combat_player):
+                                combat_player.hp -= hit["damage"]
+                                floating_texts.append({
+                                    "text": str(hit["damage"]),
+                                    "x": hit["x"],
+                                    "y": hit["y"] - 35,
+                                    "life": 45,
+                                    "color": (255, 125, 45)
+                                })
 
-                # Las balas golpean a los enemigos
-                for b in combat_player.bullets[:]:
-                    for e in enemies[:]:
-                        if e.collides_with_bullet(b):
-                            damage = 10
-                            e.hp -= damage
+                    # Las balas golpean a los enemigos
+                    for b in combat_player.bullets[:]:
+                        for e in enemies[:]:
+                            if e.collides_with_bullet(b):
+                                damage = 10
+                                e.hp -= damage
 
-                            # Generar texto flotante de daño
-                            floating_texts.append({
-                                "text": str(damage),
-                                "x": e.x,
-                                "y": e.y - 20,
-                                "life": 40,
-                                "color": (255, 50, 50)
-                            })
+                                # Generar texto flotante de daño
+                                floating_texts.append({
+                                    "text": str(damage),
+                                    "x": e.x,
+                                    "y": e.y - 20,
+                                    "life": 40,
+                                    "color": (255, 50, 50)
+                                })
 
-                            if b in combat_player.bullets:
-                                combat_player.bullets.remove(b)
-                            if e.hp <= 0:
-                                enemies.remove(e)
+                                if b in combat_player.bullets:
+                                    combat_player.bullets.remove(b)
+                                if e.hp <= 0:
+                                    enemies.remove(e)
 
-                # Actualizar textos flotantes
-                for ft in floating_texts[:]:
-                    ft["y"] -= 1.5  # Subir
-                    ft["life"] -= 1 # Desvanecerse
-                    if ft["life"] <= 0:
-                        floating_texts.remove(ft)
+                    # Actualizar textos flotantes
+                    for ft in floating_texts[:]:
+                        ft["y"] -= 1.5  # Subir
+                        ft["life"] -= 1 # Desvanecerse
+                        if ft["life"] <= 0:
+                            floating_texts.remove(ft)
 
-                # Spawnear nuevas rondas
-                if current_wave < max_waves:
-                    wave_timer -= 1
-                    if wave_timer <= 0:
-                        current_wave += 1
-                        wave_timer = 300 # Reset timer para la siguiente ola
+                    # Spawnear nuevas rondas
+                    if current_wave < max_waves:
+                        wave_timer -= 1
+                        if wave_timer <= 0:
+                            current_wave += 1
+                            wave_timer = 300 # Reset timer para la siguiente ola
 
-                        # Spawn desde la puerta del nivel activo
-                        door_x, door_y = int(world_w * 0.85), int(world_h * 0.22)
-                        enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
+                            # Spawn desde la puerta del nivel activo
+                            door_x, door_y = int(world_w * 0.85), int(world_h * 0.22)
+                            enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
 
-                        for _ in range(random.randint(3, 5)):
-                            ex = door_x + random.randint(-20, 20)
-                            ey = door_y + random.randint(-20, 20)
-                            enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
+                            for _ in range(random.randint(3, 5)):
+                                ex = door_x + random.randint(-20, 20)
+                                ey = door_y + random.randint(-20, 20)
+                                enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
 
-                        if current_wave == max_waves and current_room in engine.critical_nodes and current_room != "TIP10TEMTT1":
-                            enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
+                            if current_wave == max_waves and current_room in engine.critical_nodes and current_room != "TIP10TEMTT1":
+                                enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
 
-                # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
-                if current_wave == max_waves and not enemies:
-                    if level_passed_timer == 0 and not level_passed_done:
-                        level_passed_timer = 120 # 2 segundos
+                    # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
+                    if current_wave == max_waves and not enemies:
+                        if level_passed_timer == 0 and not level_passed_done:
+                            level_passed_timer = 120 # 2 segundos
 
-                    if level_passed_timer > 0:
-                        level_passed_timer -= 1
-                        if level_passed_timer == 0:
-                            level_passed_done = True
-                            engine.clean_room(current_room)
-                            engine.update_unlocks()
+                        if level_passed_timer > 0:
+                            level_passed_timer -= 1
+                            if level_passed_timer == 0:
+                                level_passed_done = True
+                                engine.clean_room(current_room)
+                                engine.update_unlocks()
 
-                            # AUTOSAVE
-                            save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
-                            save_indicator_timer = 120
+                                # AUTOSAVE
+                                save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
+                                save_indicator_timer = 120
 
-                            if current_room == "TIP10TEMTT1":
-                                global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
-                                save_mgr.save_global_save(global_data)
-                                bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]
+                                if current_room == "TIP10TEMTT1":
+                                    global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
+                                    save_mgr.save_global_save(global_data)
+                                    bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]
 
-                                trigger_transition("WIN", "FADE", 0.02)
-                            else:
+                                    trigger_transition("WIN", "FADE", 0.02)
+                                else:
+                                    trigger_transition("MAP", "CIRCLE", 0.04)
+
+                    if combat_player.hp <= 0:
+                        if level_failed_timer == 0 and not level_failed_done:
+                            level_failed_timer = 120 # 2 segundos
+
+                        if level_failed_timer > 0:
+                            level_failed_timer -= 1
+                            if level_failed_timer == 0:
+                                level_failed_done = True
                                 trigger_transition("MAP", "CIRCLE", 0.04)
 
-                if combat_player.hp <= 0:
-                    if level_failed_timer == 0 and not level_failed_done:
-                        level_failed_timer = 120 # 2 segundos
-
-                    if level_failed_timer > 0:
-                        level_failed_timer -= 1
-                        if level_failed_timer == 0:
-                            level_failed_done = True
-                            trigger_transition("MAP", "CIRCLE", 0.04)
+            # Temporizadores de UI a 60 Hz (independientes del FPS de render).
+            if rest_animation_timer > 0:
+                rest_animation_timer -= 1
+            if map_message_timer > 0:
+                map_message_timer -= 1
+            if save_indicator_timer > 0:
+                save_indicator_timer -= 1
 
         # Dibujado
         screen.fill(BG_COLOR)
@@ -806,6 +1141,8 @@ def main():
         elif game_state == "MAP" or (game_state == "PAUSE" and previous_state == "MAP"):
             if MAP_BG_IMG:
                 screen.blit(MAP_BG_IMG, (0, 0))
+            # Viñeteado/degradado ambiental sutil (detras de nodos y aristas).
+            screen.blit(get_map_overlay(), (0, 0))
 
             map_gen.draw(screen, font_sm, camera_x, camera_y)
 
@@ -813,67 +1150,14 @@ def main():
                 sel_rect = map_gen.rooms[selected_node].rect.copy()
                 sel_rect.x += camera_x
                 sel_rect.y += camera_y
-                pygame.draw.rect(screen, (255, 255, 0), sel_rect, 4, border_radius=8)
+                draw_selection_highlight(screen, sel_rect)
+                draw_subject_tooltip(screen, engine, selected_node, sel_rect)
 
-                # Tooltip de Prerrequisitos
-                reqs = engine.subjects[selected_node]['reqs']
-                req_lines = [f"Materia: {engine.subjects[selected_node]['name']}", "Prerrequisitos:"]
+            # HUD superior del mapa (panel pixel-art con cristales de energia).
+            draw_map_hud(screen, semester_counter, par_score, energy, max_energy)
 
-                if selected_node == "TIP10TEMTT1":
-                    cleaned_count = sum(1 for n in engine.nodes if engine.state[n] == NodeState.CLEANED)
-                    total_req = len(engine.nodes) - 1
-                    req_lines.append(f"- Completar todas las materias ({cleaned_count}/{total_req})")
-                elif not reqs:
-                    req_lines.append("- Ninguno")
-                else:
-                    for r in reqs:
-                        req_lines.append(f"- {engine.subjects[r]['name']}")
-
-                tt_surfaces = [font_sm.render(line, False, (255, 255, 255)) for line in req_lines]
-                tt_surfaces[0] = font_sm.render(req_lines[0], False, (255, 255, 100)) # Highlight name
-
-                max_w = max(s.get_width() for s in tt_surfaces)
-                tt_h = sum(s.get_height() for s in tt_surfaces) + 10
-                tt_w = max_w + 20
-
-                tt_x = sel_rect.right + 15
-                tt_y = sel_rect.top
-                if tt_x + tt_w > WIDTH: # No salir de la pantalla por la derecha
-                    tt_x = sel_rect.left - tt_w - 15
-
-                tt_bg = pygame.Surface((tt_w, tt_h))
-                tt_bg.set_alpha(240)
-                tt_bg.fill((20, 20, 30))
-                screen.blit(tt_bg, (tt_x, tt_y))
-                pygame.draw.rect(screen, (100, 100, 150), (tt_x, tt_y, tt_w, tt_h), 2)
-
-                cy = tt_y + 5
-                for s in tt_surfaces:
-                    screen.blit(s, (tt_x + 10, cy))
-                    cy += s.get_height()
-
-            # Capa de Interfaz (UI) panel de fondo
-            hud_rect = pygame.Surface((WIDTH, 110))
-            hud_rect.set_alpha(200)
-            hud_rect.fill((10, 10, 10))
-            screen.blit(hud_rect, (0, 0))
-            pygame.draw.line(screen, (200, 200, 200), (0, 110), (WIDTH, 110), 2)
-
-            ui_text = [
-                f"MALLA CURRICULAR (MAPA DAG) | Semestre: {semester_counter} | Tiempo Record: {par_score}",
-                f"Energia: {energy}/{max_energy}",
-                "Mover: WASD | Disparar: Flechas/Mouse | Entrar: ENTER | Descansar: ESPACIO"
-            ]
-
-            y_off = 15
-            for line in ui_text:
-                ts = font_md.render(line, False, TEXT_COLOR)
-                screen.blit(ts, (15, y_off))
-                y_off += 30
-
-            # Animación de descanso
+            # Animación de descanso (el contador se decrementa en la simulación a 60 Hz)
             if rest_animation_timer > 0:
-                rest_animation_timer -= 1
                 alpha = int((rest_animation_timer / 90) * 255)
 
                 overlay = pygame.Surface((WIDTH, HEIGHT))
@@ -892,7 +1176,6 @@ def main():
                 screen.blit(msg2, msg2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50 - offset_y)))
 
             if map_message_timer > 0:
-                map_message_timer -= 1
                 msg_surf = font_md.render(map_message, True, (255, 100, 100))
                 msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT - 50))
 
@@ -1104,9 +1387,8 @@ def main():
         if game_state == "PAUSE":
             pause_menu.draw(screen)
 
-        # Renderizar transición
+        # Renderizar transición (el contador se decrementa en la simulación a 60 Hz)
         if save_indicator_timer > 0:
-            save_indicator_timer -= 1
             # Fondo oscuro semitransparente
             s = pygame.Surface((180, 50), pygame.SRCALPHA)
             s.fill((0, 0, 0, 100)) # Alpha mucho más transparente (antes 200)
@@ -1131,7 +1413,8 @@ def main():
             screen.blit(s_text, (icon_x + 25, icon_y - s_text.get_height()//2))
 
         if trans_state["active"]:
-            trans_state["progress"] += trans_state["speed"]
+            # Escalado por tiempo real para que la duración sea igual a cualquier FPS.
+            trans_state["progress"] += trans_state["speed"] * render_scale
             if trans_state["progress"] >= 1.0:
                 trans_state["progress"] = 1.0
                 trans_state["active"] = False
@@ -1143,7 +1426,6 @@ def main():
         present_virtual_surface(screen, real_screen, aspect_mode)
 
         pygame.display.flip()
-        clock.tick(60)
 
 if __name__ == "__main__":
     main()

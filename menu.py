@@ -3,6 +3,27 @@ import math
 import save_manager
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
 
+
+def frame_delta(obj, max_ms=100.0):
+    """Numero de 'frames a 60 fps' transcurridos desde la ultima llamada para este objeto.
+
+    Permite que las animaciones de UI basadas en un contador (self.time += 1 por frame)
+    avancen a la misma velocidad sin importar el limite de FPS de render. A 60 FPS
+    devuelve ~1.0 por frame (identico al comportamiento previo). Limita el dt para
+    evitar saltos tras pausas o cambios de pantalla.
+    """
+    now = pygame.time.get_ticks()
+    last = getattr(obj, "_anim_last_ms", None)
+    obj._anim_last_ms = now
+    if last is None:
+        return 1.0
+    dt = now - last
+    if dt < 0:
+        dt = 0.0
+    elif dt > max_ms:
+        dt = max_ms
+    return dt / (1000.0 / 60.0)
+
 def draw_purple_cross_bg(surface, width, height, time_offset=0):
     # Base dark purple
     surface.fill((25, 5, 45))
@@ -105,7 +126,7 @@ class DisclaimerScreen:
         return None
 
     def draw(self, surface):
-        self.time += 1
+        self.time += frame_delta(self)
         surface.fill((10, 10, 15)) # Fondo oscuro
 
         # Ícono animado de guardado
@@ -159,7 +180,7 @@ class TitleScreen:
         return None
 
     def draw(self, surface):
-        self.time += 1
+        self.time += frame_delta(self)
 
         if hasattr(self, 'bg_img') and self.bg_img:
             surface.blit(self.bg_img, (0, 0))
@@ -299,7 +320,8 @@ class MainMenu:
         return None
 
     def draw(self, surface, mouse_x, mouse_y):
-        self.time += 1
+        dt_frames = frame_delta(self)
+        self.time += dt_frames
 
         if hasattr(self, 'bg_img') and self.bg_img:
             # Calculate parallax offset based on mouse position relative to center
@@ -367,7 +389,7 @@ class MainMenu:
             surface.blit(text, rect)
 
         if self.notification and self.notification_timer > 0:
-            self.notification_timer -= 1
+            self.notification_timer -= dt_frames
             # Dibujar notificación en la parte inferior
             notif_surf = self.font_md.render(self.notification, True, (255, 255, 100))
             notif_rect = notif_surf.get_rect(center=(self.width // 2, self.height - 40))
@@ -599,9 +621,23 @@ class PauseMenu:
         self.height = height
         self.font_lg = font_lg
         self.font_md = font_md
-        self.options = ["Continuar", "Opciones", "Guardar y Salir al menú principal"]
+        # "Guardar y regresar al mapa" solo aparece si se pausó durante un combate.
+        self.in_combat = False
         self.selected_index = 0
         self.option_rects = []
+
+    @property
+    def options(self):
+        opts = ["Continuar", "Opciones"]
+        if self.in_combat:
+            opts.append("Guardar y regresar al mapa")
+        opts.append("Guardar y Salir al menú principal")
+        return opts
+
+    def set_context(self, in_combat):
+        """Configura las opciones segun donde se pauso y reinicia la seleccion."""
+        self.in_combat = in_combat
+        self.selected_index = 0
 
     def update_option_rects(self):
         self.option_rects = []
@@ -845,8 +881,15 @@ class OptionsMenu:
         self.font_md = font_md
         self.font_sm = font_sm
 
-        self.options = ["Modo de Pantalla", "Resolución", "Relación de Aspecto", "Volumen General", "Volumen Música", "Aplicar y Volver", "Volver sin guardar"]
+        self.options = ["Modo de Pantalla", "Resolución", "Relación de Aspecto", "Límite de FPS", "Volumen General", "Volumen Música", "Aplicar y Volver", "Volver sin guardar"]
         self.selected_index = 0
+
+        # Límite de FPS (independiente de la resolución). "unlimited" = sin límite.
+        self.fps_options = [30, 60, 120, 144, 165, 240, "unlimited"]
+        saved_fps = global_data.get("fps_limit", 60) if global_data else 60
+        if saved_fps not in self.fps_options:
+            saved_fps = 60
+        self.fps_index = self.fps_options.index(saved_fps)
 
         self.fullscreen = global_data.get("fullscreen", True) if global_data else True
         modes = pygame.display.list_modes()
@@ -928,6 +971,9 @@ class OptionsMenu:
                 value_str = f"{r[0]}x{r[1]}"
             elif option == "Relación de Aspecto":
                 value_str = self.aspect_modes[self.aspect_index][1]
+            elif option == "Límite de FPS":
+                fps_val = self.fps_options[self.fps_index]
+                value_str = "Sin límite (+consumo)" if fps_val == "unlimited" else str(fps_val)
             elif option == "Volumen General":
                 value_str = f"{self.general_volume}%"
             elif option == "Volumen Música":
@@ -975,7 +1021,7 @@ class OptionsMenu:
                     self.selected_index = i
                     opt = self.options[self.selected_index]
                     if opt == "Aplicar y Volver":
-                        return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume}
+                        return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume, "fps_limit": self.fps_options[self.fps_index]}
                     elif opt == "Volver sin guardar":
                         return {"action": "BACK"}
                     else:
@@ -1011,13 +1057,15 @@ class OptionsMenu:
             self.res_index = (self.res_index + direction) % len(self.available_resolutions)
         elif opt == "Relación de Aspecto":
             self.aspect_index = (self.aspect_index + direction) % len(self.aspect_modes)
+        elif opt == "Límite de FPS":
+            self.fps_index = (self.fps_index + direction) % len(self.fps_options)
         elif opt == "Volumen General":
             self.general_volume = max(0, min(100, self.general_volume + direction * 10))
         elif opt == "Volumen Música":
             self.music_volume = max(0, min(100, self.music_volume + direction * 10))
 
     def draw(self, surface):
-        self.time += 1
+        self.time += frame_delta(self)
 
         if hasattr(self, 'bg_img') and self.bg_img:
             surface.blit(self.bg_img, (0, 0))
@@ -1047,6 +1095,9 @@ class OptionsMenu:
                 value_str = f"{r[0]}x{r[1]}"
             elif option == "Relación de Aspecto":
                 value_str = self.aspect_modes[self.aspect_index][1]
+            elif option == "Límite de FPS":
+                fps_val = self.fps_options[self.fps_index]
+                value_str = "Sin límite (+consumo)" if fps_val == "unlimited" else str(fps_val)
             elif option == "Volumen General":
                 value_str = f"{self.general_volume}%"
             elif option == "Volumen Música":
