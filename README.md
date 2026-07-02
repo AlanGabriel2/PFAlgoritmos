@@ -1,4 +1,4 @@
-# 🎮 Mega-Calabozo DAG
+# Mega-Calabozo DAG
 
 **Un RPG top-down 2D estilo pixel art donde recorres tu malla curricular convertida en un calabozo.**
 Desarrollado en **Python + Pygame**, combina un motor de grafos (DAG) con arenas de combate *bullet-hell*: cada materia de la carrera es una sala que debes "limpiar" para aprobarla, respetando los prerrequisitos.
@@ -7,7 +7,7 @@ Desarrollado en **Python + Pygame**, combina un motor de grafos (DAG) con arenas
 
 ---
 
-## 🧠 La idea central: la malla curricular como un DAG
+## La idea central: la malla curricular como un DAG
 
 Toda la carrera (59 materias) se representa como un **grafo dirigido acíclico**:
 
@@ -58,7 +58,7 @@ El mapa dibuja el grafo completo: nodos como salas y aristas como conexiones de 
 
 ---
 
-## 🎛️ Controles
+## Controles
 
 **En el mapa**
 - Mover / seleccionar: `WASD` o flechas · o el **mouse**
@@ -142,7 +142,7 @@ PFAlgoritmos/
 
 ---
 
-## 🏗️ Arquitectura técnica (resumen)
+##  Arquitectura técnica (resumen)
 
 - **Máquina de estados** en `main.py`: `DISCLAIMER → TITLE → MAIN_MENU → SLOT_SELECT → MAP → COMBAT → PAUSE / TUTORIAL / BESTIARY / OPTIONS → WIN / GAME_OVER`.
 - **Bucle a paso fijo (fixed timestep):** la simulación avanza en pasos fijos de 1/60 s y el render se desacopla al límite de FPS elegido.
@@ -152,7 +152,7 @@ PFAlgoritmos/
 
 ---
 
-## 📝 Notas
+##  Notas
 
 - Los mapas y colisiones de las arenas se definen en `levels/*.json` (no se hardcodean en el bucle principal).
 - Fuente pixel art principal: **VT323**; títulos con **BoldPixels**.
