@@ -26,8 +26,7 @@ python main.py
 
 ## Estilo y buenas prácticas
 
-Consulta también [`AGENTS.md`](AGENTS.md) y
-[`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) para entender la arquitectura antes de
+Consulta también [`AGENTS.md`](AGENTS.md) para entender la arquitectura antes de
 tocar código. Reglas clave del proyecto:
 
 - **Colisiones lógicas, no por píxeles.** Usa capas matemáticas (`pygame.Rect`),
