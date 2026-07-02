@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Preguntas y discusión
+    url: https://github.com/AlanGabriel2/PFAlgoritmos/discussions
+    about: Para dudas generales o ideas usa Discussions (si están habilitadas) o el correo del proyecto.
