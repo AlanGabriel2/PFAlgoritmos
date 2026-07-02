@@ -498,21 +498,25 @@ def main():
         max_x = max(r.rect.right for r in rooms.values())
         min_y = min(r.rect.top for r in rooms.values())
         max_y = max(r.rect.bottom for r in rooms.values())
-        pad = 80  # aire permitido más allá de los bordes del mapa (pequeño)
+        pad = 140      # aire permitido más allá de los bordes del mapa
+        hud_top = 104  # franja superior que tapa el HUD del mapa
 
-        # Eje X: si el mapa cabe en el viewport se mantiene casi centrado; si es más
-        # grande, la cámara se limita para que el mapa siempre cubra la pantalla + pad.
+        # Eje X: si el mapa cabe a lo ancho se mantiene casi centrado (con holgura pad).
         if (max_x - min_x) <= WIDTH:
             center_cx = (WIDTH - (min_x + max_x)) / 2
             cx_min, cx_max = center_cx - pad, center_cx + pad
         else:
             cx_min, cx_max = WIDTH - max_x - pad, -min_x + pad
 
-        if (max_y - min_y) <= HEIGHT:
-            center_cy = (HEIGHT - (min_y + max_y)) / 2
+        # Eje Y: se considera el HUD para que la PRIMERA fila pueda bajar por debajo
+        # de él y verse completa. El área útil vertical va de hud_top a HEIGHT.
+        usable_h = HEIGHT - hud_top
+        if (max_y - min_y) <= usable_h:
+            center_cy = (hud_top + HEIGHT) / 2 - (min_y + max_y) / 2
             cy_min, cy_max = center_cy - pad, center_cy + pad
         else:
-            cy_min, cy_max = HEIGHT - max_y - pad, -min_y + pad
+            cy_min = HEIGHT - pad - max_y
+            cy_max = hud_top + pad - min_y
 
         return max(cx_min, min(cx_max, cx)), max(cy_min, min(cy_max, cy))
 
