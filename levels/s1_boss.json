@@ -1,0 +1,390 @@
+{
+    "name": "s1_boss",
+    "background": "assets/images/backgrounds/s1_boss.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        836,
+        705
+    ],
+    "enemy_spawns": [
+        [
+            836,
+            230
+        ],
+        [
+            420,
+            430
+        ],
+        [
+            1252,
+            430
+        ],
+        [
+            520,
+            705
+        ],
+        [
+            1152,
+            705
+        ],
+        [
+            836,
+            470
+        ]
+    ],
+    "character_scale": 0.7,
+    "pathfinding_cell_size": 32,
+    "colliders": [
+        {
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 1672,
+            "h": 72,
+            "name": "top_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 884,
+            "y": 869,
+            "w": 788,
+            "h": 72,
+            "name": "bottom_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": -39,
+            "y": 34,
+            "w": 58,
+            "h": 941,
+            "name": "left_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 1656,
+            "y": 0,
+            "w": 16,
+            "h": 941,
+            "name": "right_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 1175,
+            "y": 599,
+            "w": 149,
+            "h": 116,
+            "name": "new_9",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1066,
+            "y": 307,
+            "w": 149,
+            "h": 119,
+            "name": "new_10",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1283,
+            "y": 172,
+            "w": 138,
+            "h": 65,
+            "name": "new_11",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 456,
+            "y": 309,
+            "w": 150,
+            "h": 121,
+            "name": "new_12",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 216,
+            "y": 172,
+            "w": 136,
+            "h": 66,
+            "name": "new_13",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 109,
+            "y": 97,
+            "w": 66,
+            "h": 115,
+            "name": "new_14",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 18,
+            "y": 71,
+            "w": 66,
+            "h": 189,
+            "name": "new_15",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 34,
+            "y": 341,
+            "w": 63,
+            "h": 106,
+            "name": "new_16",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 35,
+            "y": 495,
+            "w": 61,
+            "h": 112,
+            "name": "new_17",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 16,
+            "y": 673,
+            "w": 66,
+            "h": 205,
+            "name": "new_18",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 156,
+            "y": 773,
+            "w": 148,
+            "h": 71,
+            "name": "new_19",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 114,
+            "y": 756,
+            "w": 41,
+            "h": 33,
+            "name": "new_20",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 347,
+            "y": 596,
+            "w": 146,
+            "h": 118,
+            "name": "new_21",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 768,
+            "y": 771,
+            "w": 24,
+            "h": 110,
+            "name": "new_22",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 883,
+            "y": 770,
+            "w": 19,
+            "h": 106,
+            "name": "new_23",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1586,
+            "y": 677,
+            "w": 24,
+            "h": 199,
+            "name": "new_24",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1600,
+            "y": 676,
+            "w": 65,
+            "h": 16,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1577,
+            "y": 498,
+            "w": 55,
+            "h": 99,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1590,
+            "y": 71,
+            "w": 70,
+            "h": 206,
+            "name": "new_27",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1574,
+            "y": 346,
+            "w": 60,
+            "h": 99,
+            "name": "new_28",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 87,
+            "y": 74,
+            "w": 398,
+            "h": 95,
+            "name": "new_29",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1442,
+            "y": 139,
+            "w": 122,
+            "h": 59,
+            "name": "new_30",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 567,
+            "y": 71,
+            "w": 1020,
+            "h": 95,
+            "name": "new_31",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 474,
+            "y": 73,
+            "w": 117,
+            "h": 24,
+            "name": "new_32",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1367,
+            "y": 772,
+            "w": 151,
+            "h": 69,
+            "name": "new_33",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1412,
+            "y": 760,
+            "w": 61,
+            "h": 44,
+            "name": "new_34",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1499,
+            "y": 715,
+            "w": 38,
+            "h": 39,
+            "name": "new_35",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1523,
+            "y": 670,
+            "w": 37,
+            "h": 106,
+            "name": "new_36",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 31,
+            "y": 867,
+            "w": 761,
+            "h": 74,
+            "name": "new_37",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 770,
+            "y": 912,
+            "w": 163,
+            "h": 35,
+            "name": "new_38",
+            "type": "solid",
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [],
+    "walkable_zones": [],
+    "triggers": [],
+    "interactables": [],
+    "doors": []
+}

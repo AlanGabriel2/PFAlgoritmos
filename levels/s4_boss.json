@@ -1,0 +1,426 @@
+{
+    "name": "s4_boss",
+    "background": "assets/images/backgrounds/s4_boss.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        836,
+        705
+    ],
+    "enemy_spawns": [
+        [
+            836,
+            230
+        ],
+        [
+            420,
+            430
+        ],
+        [
+            1252,
+            430
+        ],
+        [
+            520,
+            705
+        ],
+        [
+            1152,
+            705
+        ],
+        [
+            836,
+            470
+        ]
+    ],
+    "character_scale": 0.7,
+    "pathfinding_cell_size": 32,
+    "colliders": [
+        {
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 1672,
+            "h": 72,
+            "name": "top_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 872,
+            "w": 745,
+            "h": 69,
+            "name": "bottom_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "name": "left_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 1614,
+            "y": 0,
+            "w": 58,
+            "h": 941,
+            "name": "right_wall",
+            "type": "wall",
+            "enabled": true
+        },
+        {
+            "x": 481,
+            "y": 293,
+            "w": 86,
+            "h": 113,
+            "name": "new_9",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 480,
+            "y": 563,
+            "w": 84,
+            "h": 123,
+            "name": "new_10",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1104,
+            "y": 292,
+            "w": 88,
+            "h": 118,
+            "name": "new_11",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1107,
+            "y": 562,
+            "w": 82,
+            "h": 124,
+            "name": "new_12",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 928,
+            "y": 815,
+            "w": 22,
+            "h": 58,
+            "name": "new_13",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1005,
+            "y": 810,
+            "w": 62,
+            "h": 67,
+            "name": "new_14",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 959,
+            "y": 835,
+            "w": 559,
+            "h": 35,
+            "name": "new_15",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1496,
+            "y": 756,
+            "w": 23,
+            "h": 98,
+            "name": "new_16",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1511,
+            "y": 760,
+            "w": 152,
+            "h": 22,
+            "name": "new_17",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1553,
+            "y": 565,
+            "w": 58,
+            "h": 65,
+            "name": "new_18",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1555,
+            "y": 321,
+            "w": 55,
+            "h": 208,
+            "name": "new_19",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1518,
+            "y": 94,
+            "w": 48,
+            "h": 127,
+            "name": "new_20",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1537,
+            "y": 221,
+            "w": 55,
+            "h": 54,
+            "name": "new_21",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 980,
+            "y": 73,
+            "w": 609,
+            "h": 60,
+            "name": "new_22",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 662,
+            "y": 70,
+            "w": 345,
+            "h": 97,
+            "name": "new_23",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1130,
+            "y": 105,
+            "w": 40,
+            "h": 70,
+            "name": "new_24",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 492,
+            "y": 54,
+            "w": 57,
+            "h": 109,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 129,
+            "y": 72,
+            "w": 175,
+            "h": 59,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 382,
+            "y": 75,
+            "w": 322,
+            "h": 57,
+            "name": "new_27",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 298,
+            "y": 72,
+            "w": 94,
+            "h": 27,
+            "name": "new_28",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 44,
+            "y": 68,
+            "w": 96,
+            "h": 208,
+            "name": "new_29",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 85,
+            "y": 319,
+            "w": 36,
+            "h": 116,
+            "name": "new_30",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 87,
+            "y": 431,
+            "w": 31,
+            "h": 55,
+            "name": "new_31",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 70,
+            "y": 569,
+            "w": 44,
+            "h": 54,
+            "name": "new_32",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 63,
+            "y": 758,
+            "w": 117,
+            "h": 40,
+            "name": "new_33",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 157,
+            "y": 801,
+            "w": 20,
+            "h": 50,
+            "name": "new_34",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 177,
+            "y": 837,
+            "w": 568,
+            "h": 26,
+            "name": "new_35",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 239,
+            "y": 811,
+            "w": 57,
+            "h": 57,
+            "name": "new_36",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 720,
+            "y": 814,
+            "w": 25,
+            "h": 72,
+            "name": "new_37",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 607,
+            "y": 811,
+            "w": 61,
+            "h": 56,
+            "name": "new_38",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 521,
+            "y": 819,
+            "w": 25,
+            "h": 48,
+            "name": "new_39",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 382,
+            "y": 824,
+            "w": 86,
+            "h": 44,
+            "name": "new_40",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 927,
+            "y": 869,
+            "w": 743,
+            "h": 73,
+            "name": "new_41",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 722,
+            "y": 929,
+            "w": 231,
+            "h": 63,
+            "name": "new_42",
+            "type": "solid",
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [],
+    "walkable_zones": [],
+    "triggers": [],
+    "interactables": [],
+    "doors": []
+}

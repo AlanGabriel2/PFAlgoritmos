@@ -12,6 +12,8 @@ BASE_DIR = Path(__file__).resolve().parent
 LEVELS_DIR = BASE_DIR / "levels"
 DEFAULT_COMBAT_LEVEL = "combat_default"
 BACKGROUND_DIR = BASE_DIR / "assets" / "images" / "backgrounds"
+DEFAULT_HAZARD_DAMAGE = 8
+DEFAULT_HAZARD_DAMAGE_COOLDOWN = 45
 
 
 def resolve_asset_path(path_value):
@@ -96,7 +98,8 @@ class Level:
                     "name": item.get("name", f"hazard_{index}"),
                     "type": item.get("type", "hazard"),
                     "enabled": item.get("enabled", True),
-                    "damage": item.get("damage", 0),
+                    "damage": item.get("damage", DEFAULT_HAZARD_DAMAGE),
+                    "damage_cooldown": item.get("damage_cooldown", DEFAULT_HAZARD_DAMAGE_COOLDOWN),
                 }
             )
             
@@ -151,6 +154,11 @@ class Level:
             walkable_zones=self.walkable_zones,
             walkable_metadata=self.walkable_metadata,
         )
+
+    def iter_hazard_hits(self, rect):
+        for hazard_rect, data in zip(self.hazard_zones, self.hazard_metadata):
+            if data.get("enabled", True) and rect.colliderect(hazard_rect):
+                yield hazard_rect, data
 
     def draw_hazard_debug(self, surface, camera=None, font=None, show_names=False):
         offset_x, offset_y = 0, 0
@@ -260,16 +268,26 @@ def load_level(level_name_or_path, fallback_size=(1280, 720)):
         return Level.from_dict(json.load(f), fallback_size=fallback_size)
 
 
-def load_combat_level(room_id=None, fallback_size=(1280, 720)):
+def load_combat_level(room_id=None, fallback_size=(1280, 720), variant_suffix=None, variant_fallback=None):
     candidates = []
     if room_id:
-        candidates.append(room_id)
         semester_key = level_key_from_room_id(room_id)
+        if variant_suffix:
+            candidates.append(f"{room_id}_{variant_suffix}")
+            if semester_key:
+                candidates.append(f"{semester_key}_{variant_suffix}")
+            if variant_fallback:
+                candidates.append(variant_fallback)
+        candidates.append(room_id)
         if semester_key:
             candidates.append(semester_key)
     candidates.append(DEFAULT_COMBAT_LEVEL)
 
+    seen = set()
     for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
         path = resolve_level_path(candidate)
         if path.exists():
             return load_level(path, fallback_size)

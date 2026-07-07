@@ -1,5 +1,7 @@
 import pygame
 
+from level import DEFAULT_HAZARD_DAMAGE, DEFAULT_HAZARD_DAMAGE_COOLDOWN
+
 class CollisionEditor:
     def __init__(self, level, collision_manager):
         self.level = level
@@ -198,6 +200,9 @@ class CollisionEditor:
             
         n_rects, n_meta = self.get_list_by_type(next_t)
         m["type"] = next_t
+        if next_t == "hazard":
+            m.setdefault("damage", DEFAULT_HAZARD_DAMAGE)
+            m.setdefault("damage_cooldown", DEFAULT_HAZARD_DAMAGE_COOLDOWN)
         n_rects.append(r)
         n_meta.append(m)
         

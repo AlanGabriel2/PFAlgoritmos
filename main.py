@@ -11,7 +11,7 @@ from player import Player, init_player_assets
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
 from enemy_ai import draw_enemy_ai_debug
 from pathfinding import PathFinder
-from level import load_combat_level
+from level import DEFAULT_HAZARD_DAMAGE, DEFAULT_HAZARD_DAMAGE_COOLDOWN, load_combat_level, level_key_from_room_id
 from collision_editor import CollisionEditor
 from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu
 from tutorial import TutorialState
@@ -29,6 +29,9 @@ FIXED_DT_MS = 1000.0 / FIXED_FPS
 MAX_SIM_STEPS = 5  # Tope de pasos de simulacion por frame (evita "spiral of death").
 VALID_FPS_LIMITS = [30, 60, 120, 144, 165, 240, "unlimited"]
 DEFAULT_FPS_LIMIT = 60
+FINAL_BOSS_ROOM_ID = "TIP10TEMTT1"
+MINIBOSS_LEVEL_SUFFIX = "boss"
+MINIBOSS_BOSS_LEVEL_KEYS = {"s1", "s4", "s9"}
 
 
 def sanitize_fps_limit(value):
@@ -402,7 +405,7 @@ def draw_subject_tooltip(surface, engine, selected_node, sel_rect):
     name = engine.subjects[selected_node]['name']
     reqs = engine.subjects[selected_node]['reqs']
     entries = []  # (texto, color)
-    if selected_node == "TIP10TEMTT1":
+    if selected_node == FINAL_BOSS_ROOM_ID:
         cleaned = sum(1 for n in engine.nodes if engine.state[n] == NodeState.CLEANED)
         total = len(engine.nodes) - 1
         entries.append((f"- Completar todas las materias ({cleaned}/{total})", MAP_UI["text"]))
@@ -540,6 +543,7 @@ def main():
     wave_timer = 0
 
     floating_texts = [] # Lista para almacenar los números de daño flotantes
+    player_hazard_cooldown = 0
 
     trans_state = {
         "active": False,
@@ -600,13 +604,67 @@ def main():
             return pygame.transform.scale(FLOOR_IMG, tuple(level.size))
         return None
 
+    def is_miniboss_room(room_id):
+        return bool(room_id and room_id in engine.critical_nodes and room_id != FINAL_BOSS_ROOM_ID)
+
+    def miniboss_level_variant_for(room_id):
+        if not is_miniboss_room(room_id):
+            return None
+        semester_key = level_key_from_room_id(room_id)
+        if semester_key in MINIBOSS_BOSS_LEVEL_KEYS:
+            return MINIBOSS_LEVEL_SUFFIX
+        return None
+
     def load_room_level(room_id):
         nonlocal current_level, collision_manager, combat_bg_img, editor, pathfinder
-        current_level = load_combat_level(room_id, fallback_size=(ARENA_W, ARENA_H))
+        level_variant = miniboss_level_variant_for(room_id)
+        current_level = load_combat_level(
+            room_id,
+            fallback_size=(ARENA_W, ARENA_H),
+            variant_suffix=level_variant,
+        )
         collision_manager = current_level.create_collision_manager()
         pathfinder = PathFinder(current_level)
         editor = CollisionEditor(current_level, collision_manager)
         combat_bg_img = load_level_background(current_level)
+
+    def positive_int(value, fallback):
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return fallback
+        return parsed if parsed > 0 else fallback
+
+    def apply_player_hazard_damage():
+        nonlocal player_hazard_cooldown
+        if player_hazard_cooldown > 0:
+            player_hazard_cooldown -= 1
+            return
+        if not current_level or not combat_player:
+            return
+
+        strongest_hit = None
+        for hazard_rect, data in current_level.iter_hazard_hits(combat_player.rect):
+            damage = positive_int(data.get("damage"), DEFAULT_HAZARD_DAMAGE)
+            if strongest_hit is None or damage > strongest_hit["damage"]:
+                strongest_hit = {"rect": hazard_rect, "data": data, "damage": damage}
+
+        if not strongest_hit:
+            return
+
+        damage = strongest_hit["damage"]
+        combat_player.hp -= damage
+        player_hazard_cooldown = positive_int(
+            strongest_hit["data"].get("damage_cooldown"),
+            DEFAULT_HAZARD_DAMAGE_COOLDOWN,
+        )
+        floating_texts.append({
+            "text": str(damage),
+            "x": combat_player.x,
+            "y": combat_player.y - 38,
+            "life": 38,
+            "color": (255, 220, 80)
+        })
 
     def spawn_enemy(enemy_cls, preferred_positions=None):
         world_w, world_h = combat_world_size()
@@ -639,7 +697,7 @@ def main():
         return enemy_cls(last_position[0], last_position[1], scale=scale)
 
     def start_combat(room_id):
-        nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy, level_passed_timer, level_passed_done, level_failed_timer, level_failed_done
+        nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy, level_passed_timer, level_passed_done, level_failed_timer, level_failed_done, player_hazard_cooldown
         current_room = room_id
         load_room_level(current_room)
         trigger_transition("COMBAT", "CIRCLE", 0.03)
@@ -648,6 +706,7 @@ def main():
         level_passed_done = False
         level_failed_timer = 0
         level_failed_done = False
+        player_hazard_cooldown = 0
 
         world_w, world_h = combat_world_size()
         scale = current_level.character_scale if current_level else 1.0
@@ -662,9 +721,9 @@ def main():
 
         enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
         enemies = [spawn_enemy(random.choice(enemy_types)) for _ in range(random.randint(3, 6))]
-        if current_room == "TIP10TEMTT1":
+        if current_room == FINAL_BOSS_ROOM_ID:
             enemies.append(spawn_enemy(Boss, [(world_w // 2, 140)]))
-        if current_room in engine.critical_nodes and current_room != "TIP10TEMTT1" and max_waves == 1:
+        if is_miniboss_room(current_room) and max_waves == 1:
             enemies.append(spawn_enemy(MiniBoss, [(world_w // 2, world_h // 3)]))
     load_room_level(None)
     last_click_time = 0
@@ -1000,6 +1059,7 @@ def main():
 
                     combat_player.move(keys, world_w, world_h, collision_manager)
                     combat_player.update_bullets(world_w, world_h)
+                    apply_player_hazard_damage()
 
                     update_combat_camera(smooth=True)
 
@@ -1079,7 +1139,7 @@ def main():
                                 ey = door_y + random.randint(-20, 20)
                                 enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
 
-                            if current_wave == max_waves and current_room in engine.critical_nodes and current_room != "TIP10TEMTT1":
+                            if current_wave == max_waves and is_miniboss_room(current_room):
                                 enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
 
                     # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
@@ -1098,7 +1158,7 @@ def main():
                                 save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
                                 save_indicator_timer = 120
 
-                                if current_room == "TIP10TEMTT1":
+                                if current_room == FINAL_BOSS_ROOM_ID:
                                     global_data["bestiary_unlocks"] = list(set(global_data.get("bestiary_unlocks", []) + ["MEGA BOSS (TITULACION)"]))
                                     save_mgr.save_global_save(global_data)
                                     bestiary_menu.unlocked_names = global_data["bestiary_unlocks"]

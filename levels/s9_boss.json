@@ -1,0 +1,130 @@
+{
+    "name": "s9_boss",
+    "background": "assets/images/backgrounds/s9_boss.png",
+    "size": [
+        1672,
+        941
+    ],
+    "coordinate_system": "world coordinates in source background pixels",
+    "player_spawn": [
+        836,
+        705
+    ],
+    "enemy_spawns": [
+        [
+            836,
+            230
+        ],
+        [
+            420,
+            430
+        ],
+        [
+            1252,
+            430
+        ],
+        [
+            520,
+            705
+        ],
+        [
+            1152,
+            705
+        ],
+        [
+            836,
+            470
+        ]
+    ],
+    "character_scale": 0.7,
+    "pathfinding_cell_size": 32,
+    "colliders": [
+        {
+            "name": "top_boundary",
+            "type": "boundary",
+            "x": 0,
+            "y": -64,
+            "w": 1672,
+            "h": 64,
+            "enabled": true
+        },
+        {
+            "name": "bottom_boundary",
+            "type": "boundary",
+            "x": 0,
+            "y": 941,
+            "w": 1672,
+            "h": 64,
+            "enabled": true
+        },
+        {
+            "name": "left_boundary",
+            "type": "boundary",
+            "x": -64,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "enabled": true
+        },
+        {
+            "name": "right_boundary",
+            "type": "boundary",
+            "x": 1672,
+            "y": 0,
+            "w": 64,
+            "h": 941,
+            "enabled": true
+        },
+        {
+            "name": "top_wall",
+            "type": "wall",
+            "x": 0,
+            "y": 0,
+            "w": 1672,
+            "h": 72,
+            "enabled": true
+        },
+        {
+            "name": "bottom_wall",
+            "type": "wall",
+            "x": 0,
+            "y": 872,
+            "w": 1672,
+            "h": 69,
+            "enabled": true
+        },
+        {
+            "name": "left_wall",
+            "type": "wall",
+            "x": 0,
+            "y": 0,
+            "w": 58,
+            "h": 941,
+            "enabled": true
+        },
+        {
+            "name": "right_wall",
+            "type": "wall",
+            "x": 1614,
+            "y": 0,
+            "w": 58,
+            "h": 941,
+            "enabled": true
+        }
+    ],
+    "hazard_zones": [],
+    "walkable_zones": [
+        {
+            "name": "main_miniboss_arena",
+            "type": "walkable",
+            "x": 80,
+            "y": 96,
+            "w": 1512,
+            "h": 760,
+            "enabled": true
+        }
+    ],
+    "triggers": [],
+    "interactables": [],
+    "doors": []
+}
