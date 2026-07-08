@@ -8,25 +8,52 @@ if not os.path.exists(SAVE_DIR):
 
 GLOBAL_SAVE = os.path.join(SAVE_DIR, "global_save.json")
 
+DEFAULT_GLOBAL_SAVE = {
+    "bestiary_unlocks": ["BUG", "CODIGO SPAGHETTI", "MEMORY LEAK", "EL RELOJ (DEADLINE)"],
+    "volume": 100,
+    "music_volume": 100,
+    "resolution": [1280, 720],
+    "fullscreen": True,
+    "aspect_mode": "fit",
+    "fps_limit": 60,
+    "tutorial_completed": False
+}
+
+def _default_global_save():
+    data = DEFAULT_GLOBAL_SAVE.copy()
+    data["bestiary_unlocks"] = list(DEFAULT_GLOBAL_SAVE["bestiary_unlocks"])
+    return data
+
+def _normalize_percent(value, fallback=100):
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    if 0 <= parsed <= 1:
+        parsed *= 100
+    return max(0, min(100, int(round(parsed))))
+
 def load_global_save():
+    data = None
     if os.path.exists(GLOBAL_SAVE):
-        with open(GLOBAL_SAVE, "r") as f:
-            try:
-                return json.load(f)
-            except:
-                pass
-    # Defaults
-    return {
-        "bestiary_unlocks": ["BUG", "CODIGO SPAGHETTI", "MEMORY LEAK", "EL RELOJ (DEADLINE)"],
-        "volume": 0.5,
-        "resolution": [1280, 720],
-        "fullscreen": True,
-        "aspect_mode": "fit",
-        "tutorial_completed": False
-    }
+        try:
+            with open(GLOBAL_SAVE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            data = None
+
+    merged = _default_global_save()
+    if isinstance(data, dict):
+        merged.update(data)
+
+    if not isinstance(merged.get("bestiary_unlocks"), list):
+        merged["bestiary_unlocks"] = list(DEFAULT_GLOBAL_SAVE["bestiary_unlocks"])
+    merged["volume"] = _normalize_percent(merged.get("volume"), DEFAULT_GLOBAL_SAVE["volume"])
+    merged["music_volume"] = _normalize_percent(merged.get("music_volume"), DEFAULT_GLOBAL_SAVE["music_volume"])
+    return merged
 
 def save_global_save(data):
-    with open(GLOBAL_SAVE, "w") as f:
+    with open(GLOBAL_SAVE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
 def get_slot_path(slot_index):
@@ -48,16 +75,17 @@ def save_game(slot_index, engine, semester_counter, energy, max_energy, camera_x
         "camera_y": camera_y,
         "nodes_state": engine.state
     }
-    with open(get_slot_path(slot_index), "w") as f:
+    with open(get_slot_path(slot_index), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
 def load_game(slot_index):
     if has_save(slot_index):
-        with open(get_slot_path(slot_index), "r") as f:
-            try:
-                return json.load(f)
-            except:
-                return None
+        try:
+            with open(get_slot_path(slot_index), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
     return None
 
 def get_latest_slot():

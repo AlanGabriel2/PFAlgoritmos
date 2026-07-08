@@ -106,7 +106,7 @@ python main.py
 
 Desde el menú de **Opciones** puedes ajustar:
 - **Resolución** y **modo de pantalla** (ventana / pantalla completa).
-- **Relación de aspecto** (16:9 completo o llenar).
+- **Vista de pantalla**: ver todo con barras o llenar pantalla recortando sin estirar.
 - **Límite de FPS**: `30 / 60 / 120 / 144 / 165 / 240 / Sin límite`.
 - **Volumen** general y de música.
 

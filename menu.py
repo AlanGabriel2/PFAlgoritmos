@@ -881,7 +881,7 @@ class OptionsMenu:
         self.font_md = font_md
         self.font_sm = font_sm
 
-        self.options = ["Modo de Pantalla", "Resolución", "Relación de Aspecto", "Límite de FPS", "Volumen General", "Volumen Música", "Aplicar y Volver", "Volver sin guardar"]
+        self.options = ["Modo de Pantalla", "Resolución", "Vista de pantalla", "Límite de FPS", "Volumen General", "Volumen Música", "Aplicar y Volver", "Volver sin guardar"]
         self.selected_index = 0
 
         # Límite de FPS (independiente de la resolución). "unlimited" = sin límite.
@@ -923,8 +923,8 @@ class OptionsMenu:
                 break
 
         self.aspect_modes = [
-            ("fit", "16:9 completo"),
-            ("fill", "Llenar sin estirar"),
+            ("fit", "Ver todo (con barras)"),
+            ("fill", "Llenar pantalla (recorta)"),
         ]
         saved_aspect = global_data.get("aspect_mode", "fit") if global_data else "fit"
         self.aspect_index = 0
@@ -969,7 +969,7 @@ class OptionsMenu:
             elif option == "Resolución":
                 r = self.available_resolutions[self.res_index]
                 value_str = f"{r[0]}x{r[1]}"
-            elif option == "Relación de Aspecto":
+            elif option == "Vista de pantalla":
                 value_str = self.aspect_modes[self.aspect_index][1]
             elif option == "Límite de FPS":
                 fps_val = self.fps_options[self.fps_index]
@@ -1042,7 +1042,7 @@ class OptionsMenu:
             elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                 opt = self.options[self.selected_index]
                 if opt == "Aplicar y Volver":
-                    return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume}
+                    return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume, "fps_limit": self.fps_options[self.fps_index]}
                 elif opt == "Volver sin guardar":
                     return {"action": "BACK"}
                 else:
@@ -1055,7 +1055,7 @@ class OptionsMenu:
             self.fullscreen = not self.fullscreen
         elif opt == "Resolución":
             self.res_index = (self.res_index + direction) % len(self.available_resolutions)
-        elif opt == "Relación de Aspecto":
+        elif opt == "Vista de pantalla":
             self.aspect_index = (self.aspect_index + direction) % len(self.aspect_modes)
         elif opt == "Límite de FPS":
             self.fps_index = (self.fps_index + direction) % len(self.fps_options)
@@ -1093,7 +1093,7 @@ class OptionsMenu:
             elif option == "Resolución":
                 r = self.available_resolutions[self.res_index]
                 value_str = f"{r[0]}x{r[1]}"
-            elif option == "Relación de Aspecto":
+            elif option == "Vista de pantalla":
                 value_str = self.aspect_modes[self.aspect_index][1]
             elif option == "Límite de FPS":
                 fps_val = self.fps_options[self.fps_index]

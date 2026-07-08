@@ -1,2 +1,8 @@
 # Documento de contexto local para IAs (no se publica en el repo)
 PROJECT_CONTEXT.md
+
+# Archivos generados/locales
+__pycache__/
+*.py[cod]
+*.bak
+saves/*.json
