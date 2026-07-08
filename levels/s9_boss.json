@@ -40,90 +40,319 @@
     "pathfinding_cell_size": 32,
     "colliders": [
         {
-            "name": "top_boundary",
-            "type": "boundary",
             "x": 0,
             "y": -64,
             "w": 1672,
             "h": 64,
+            "name": "top_boundary",
+            "type": "boundary",
             "enabled": true
         },
         {
-            "name": "bottom_boundary",
-            "type": "boundary",
             "x": 0,
             "y": 941,
             "w": 1672,
             "h": 64,
+            "name": "bottom_boundary",
+            "type": "boundary",
             "enabled": true
         },
         {
-            "name": "left_boundary",
-            "type": "boundary",
             "x": -64,
             "y": 0,
             "w": 64,
             "h": 941,
+            "name": "left_boundary",
+            "type": "boundary",
             "enabled": true
         },
         {
-            "name": "right_boundary",
-            "type": "boundary",
             "x": 1672,
             "y": 0,
             "w": 64,
             "h": 941,
+            "name": "right_boundary",
+            "type": "boundary",
             "enabled": true
         },
         {
-            "name": "top_wall",
-            "type": "wall",
-            "x": 0,
-            "y": 0,
+            "x": 10,
+            "y": -5,
             "w": 1672,
             "h": 72,
+            "name": "top_wall",
+            "type": "wall",
             "enabled": true
         },
         {
+            "x": -33,
+            "y": 864,
+            "w": 1675,
+            "h": 69,
             "name": "bottom_wall",
             "type": "wall",
-            "x": 0,
-            "y": 872,
-            "w": 1672,
-            "h": 69,
             "enabled": true
         },
         {
-            "name": "left_wall",
-            "type": "wall",
             "x": 0,
             "y": 0,
             "w": 58,
             "h": 941,
+            "name": "left_wall",
+            "type": "wall",
             "enabled": true
         },
         {
-            "name": "right_wall",
-            "type": "wall",
             "x": 1614,
             "y": 0,
             "w": 58,
             "h": 941,
+            "name": "right_wall",
+            "type": "wall",
             "enabled": true
-        }
-    ],
-    "hazard_zones": [],
-    "walkable_zones": [
+        },
         {
-            "name": "main_miniboss_arena",
-            "type": "walkable",
-            "x": 80,
-            "y": 96,
-            "w": 1512,
-            "h": 760,
+            "x": 305,
+            "y": 394,
+            "w": 104,
+            "h": 145,
+            "name": "new_9",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 326,
+            "y": 721,
+            "w": 381,
+            "h": 142,
+            "name": "new_10",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 706,
+            "y": 725,
+            "w": 37,
+            "h": 65,
+            "name": "new_11",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 744,
+            "y": 740,
+            "w": 57,
+            "h": 25,
+            "name": "new_12",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 871,
+            "y": 740,
+            "w": 72,
+            "h": 28,
+            "name": "new_13",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 751,
+            "y": 806,
+            "w": 166,
+            "h": 104,
+            "name": "new_14",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 958,
+            "y": 718,
+            "w": 390,
+            "h": 165,
+            "name": "new_15",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1348,
+            "y": 853,
+            "w": 60,
+            "h": 36,
+            "name": "new_16",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1534,
+            "y": 674,
+            "w": 80,
+            "h": 47,
+            "name": "new_17",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1547,
+            "y": 406,
+            "w": 84,
+            "h": 107,
+            "name": "new_18",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1535,
+            "y": 219,
+            "w": 81,
+            "h": 40,
+            "name": "new_19",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1334,
+            "y": 62,
+            "w": 301,
+            "h": 69,
+            "name": "new_20",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 962,
+            "y": 30,
+            "w": 385,
+            "h": 164,
+            "name": "new_21",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 329,
+            "y": 67,
+            "w": 387,
+            "h": 125,
+            "name": "new_22",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 708,
+            "y": 37,
+            "w": 273,
+            "h": 91,
+            "name": "new_23",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 60,
+            "y": 67,
+            "w": 305,
+            "h": 68,
+            "name": "new_24",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 64,
+            "y": 224,
+            "w": 75,
+            "h": 38,
+            "name": "new_25",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 62,
+            "y": 412,
+            "w": 67,
+            "h": 103,
+            "name": "new_26",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 64,
+            "y": 676,
+            "w": 74,
+            "h": 40,
+            "name": "new_27",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 268,
+            "y": 852,
+            "w": 55,
+            "h": 34,
+            "name": "new_28",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 51,
+            "y": 852,
+            "w": 38,
+            "h": 37,
+            "name": "new_29",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1259,
+            "y": 389,
+            "w": 115,
+            "h": 155,
+            "name": "new_30",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1260,
+            "y": 516,
+            "w": 27,
+            "h": 38,
+            "name": "new_31",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 384,
+            "y": 508,
+            "w": 26,
+            "h": 41,
+            "name": "new_32",
+            "type": "solid",
             "enabled": true
         }
     ],
+    "hazard_zones": [
+        {
+            "x": 139,
+            "y": 275,
+            "w": 139,
+            "h": 390,
+            "name": "new_33",
+            "type": "hazard",
+            "enabled": true,
+            "damage": 8,
+            "damage_cooldown": 45
+        },
+        {
+            "x": 1399,
+            "y": 272,
+            "w": 140,
+            "h": 397,
+            "name": "new_33",
+            "type": "hazard",
+            "enabled": true,
+            "damage": 8,
+            "damage_cooldown": 45
+        }
+    ],
+    "walkable_zones": [],
     "triggers": [],
     "interactables": [],
     "doors": []

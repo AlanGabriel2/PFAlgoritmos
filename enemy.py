@@ -962,3 +962,23 @@ class Boss(Enemy):
                 self.bullets.append(EnemyBullet(self.x, self.y, angle, speed=4, radius=12, b_type="boss"))
             self.action_timer = 0
             self.state = 0
+
+
+# Todos los tipos que pueden aparecer en combate (enemigos + jefes).
+COMBAT_ENEMY_CLASSES = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss]
+
+
+def preload_combat_assets(scales=(1.0,)):
+    """Precalienta el caché de sprites de todos los enemigos y jefes.
+
+    Instancia una vez cada clase (objetos desechables) para forzar la carga y el
+    corte de sus spritesheets, evitando el tirón la primera vez que aparecen en
+    combate. Como el corte nativo se cachea de forma independiente de la escala,
+    basta con una escala; las demás solo pagan un reescalado barato en su primer uso.
+    """
+    for scale in scales:
+        for enemy_cls in COMBAT_ENEMY_CLASSES:
+            try:
+                enemy_cls(0, 0, scale=scale)
+            except Exception as e:
+                print(f"Preload fallo para {enemy_cls.__name__}: {e}")

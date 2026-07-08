@@ -131,7 +131,7 @@
             "x": 1328,
             "y": 247,
             "w": 130,
-            "h": 48,
+            "h": 60,
             "name": "top_right_generator",
             "type": "generator",
             "enabled": true
@@ -405,6 +405,33 @@
             "name": "new_41",
             "type": "solid",
             "enabled": true
+        },
+        {
+            "x": 1347,
+            "y": 88,
+            "w": 96,
+            "h": 90,
+            "name": "new_42",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1440,
+            "y": 98,
+            "w": 87,
+            "h": 64,
+            "name": "new_43",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 161,
+            "y": 90,
+            "w": 54,
+            "h": 48,
+            "name": "new_44",
+            "type": "solid",
+            "enabled": true
         }
     ],
     "hazard_zones": [
@@ -416,11 +443,13 @@
             "name": "reactor_energy_field",
             "type": "reactor_hazard",
             "enabled": true,
-            "damage": 0
+            "damage": 0,
+            "damage_cooldown": 45
         }
     ],
     "triggers": [],
     "interactables": [],
     "doors": [],
-    "walkable_zones": []
+    "walkable_zones": [],
+    "pathfinding_cell_size": 24
 }

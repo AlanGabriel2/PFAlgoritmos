@@ -8,7 +8,7 @@ from transitions import render_transition
 from dag_engine import DagEngine, NodeState
 from map_generator import MapGenerator
 from player import Player, init_player_assets
-from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
+from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss, preload_combat_assets
 from enemy_ai import draw_enemy_ai_debug
 from pathfinding import PathFinder
 from level import DEFAULT_HAZARD_DAMAGE, DEFAULT_HAZARD_DAMAGE_COOLDOWN, load_combat_level, level_key_from_room_id
@@ -175,6 +175,26 @@ except:
     font_md = pygame.font.SysFont("Arial", 24)
     font_lg = pygame.font.SysFont("Arial", 48)
     font_title = pygame.font.SysFont("Arial", 80)
+
+# --- Precarga de sprites de combate ---
+# Corta y cachea AHORA (en el arranque) las hojas de todos los enemigos/jefes y del
+# jugador, para que la primera aparición en combate no provoque un tirón de FPS.
+# Es la parte cara (disco + decode + recorte por frame); hacerla una vez aquí evita
+# repetirla en mitad de la partida.
+try:
+    real_screen.fill((0, 0, 0))
+    _loading_txt = font_lg.render("Cargando...", False, (235, 180, 125))
+    real_screen.blit(_loading_txt, _loading_txt.get_rect(center=(real_screen.get_width() // 2, real_screen.get_height() // 2)))
+    pygame.display.flip()
+    pygame.event.pump()  # mantiene la ventana responsiva mientras se cargan los sprites
+except Exception:
+    pass
+
+preload_combat_assets()
+try:
+    Player(0, 0)  # calienta también el spritesheet del jugador
+except Exception as e:
+    print("Preload del jugador fallo:", e)
 
 # Colores
 BG_COLOR = (20, 20, 25)
@@ -606,6 +626,17 @@ def main():
     previous_state = None
     options_return_state = "MAIN_MENU"
 
+    def ui_safe_rect():
+        """Zona de la superficie virtual que realmente se ve tras el fit/fill.
+
+        Todas las pantallas usan el modo elegido (fit/fill): en 'fill' el fondo llena
+        la pantalla (recortar el fondo es inofensivo) y los elementos anclados a un
+        borde (títulos de esquina, textos inferiores...) se reubican dentro de esta
+        zona para que no se corten. En 'fit' equivale a toda la superficie, así que el
+        anclaje es transparente. Ver cómo se aplica a los menús con `safe_rect`.
+        """
+        return get_visible_virtual_rect(real_screen.get_size(), aspect_mode)
+
     # Variables de la Cámara del Mapa
     camera_x, camera_y = 0, 0
     dragging = False
@@ -749,7 +780,7 @@ def main():
         global_data["tutorial_completed"] = True
         save_mgr.save_global_save(global_data)
         main_menu.tutorial_completed = True
-        main_menu.options = ["Jugar", "Tutorial", "Opciones", "Salir"]
+        main_menu.options = ["Jugar", "Bestiario", "Tutorial", "Opciones", "Salir"]
         trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
 
     def combat_world_size():
@@ -1381,6 +1412,15 @@ def main():
         # Dibujado
         screen.fill(BG_COLOR)
 
+        # Área realmente visible: las pantallas de UI anclan a ella sus elementos de
+        # borde para que 'fill' no los recorte en monitores no 16:9 (en 'fit' es toda
+        # la superficie, así que no cambia nada).
+        _ui_view = ui_safe_rect()
+        for _ui in (disclaimer_screen, title_screen, main_menu, slot_select_menu,
+                    options_menu, bestiary_menu, pause_menu, tutorial_state):
+            if _ui is not None:
+                _ui.safe_rect = _ui_view
+
         if game_state == "DISCLAIMER_SCREEN":
             disclaimer_screen.draw(screen)
         elif game_state == "TITLE_SCREEN":
@@ -1680,7 +1720,9 @@ def main():
             # Dibujamos encima del 'screen' que ya tiene el nuevo estado
             render_transition(screen, trans_state["old_surf"], screen.copy(), trans_state["type"], trans_state["progress"], WIDTH, HEIGHT)
 
-        # Escalado final: mantiene 16:9 sin deformar; fit usa barras y fill recorta.
+        # Escalado final: mantiene 16:9 sin deformar. fit deja barras; fill llena la
+        # pantalla (recortando bordes). El contenido pegado a los bordes se ancló antes
+        # al área visible (ui_safe_rect / safe_rect) para que fill no lo corte.
         present_virtual_surface(screen, real_screen, aspect_mode)
 
         pygame.display.flip()

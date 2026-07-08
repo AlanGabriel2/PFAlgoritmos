@@ -4,6 +4,22 @@ import save_manager
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
 
 
+def safe_edges(menu):
+    """Bordes (left, top, right, bottom) del área realmente visible en pantalla.
+
+    Sirve para anclar a ellos los elementos pegados a un borde (títulos de esquina,
+    textos inferiores...) y que el modo 'fill' no los recorte en monitores que no son
+    16:9. `safe_rect` lo fija el bucle principal cada frame; si no está (modo 'fit' o
+    pantalla 16:9) equivale a toda la superficie, así que el anclaje no cambia nada.
+    El contenido centrado no necesita esto: el recorte de 'fill' es simétrico y su
+    centro coincide con el de la superficie.
+    """
+    r = getattr(menu, "safe_rect", None)
+    if r is None:
+        return 0, 0, menu.width, menu.height
+    return r.left, r.top, r.right, r.bottom
+
+
 def frame_delta(obj, max_ms=100.0):
     """Numero de 'frames a 60 fps' transcurridos desde la ultima llamada para este objeto.
 
@@ -201,7 +217,7 @@ class TitleScreen:
             title_rect = title_surf.get_rect(center=(self.width // 2, title_center_y))
             surface.blit(title_surf, title_rect)
 
-        prompt_center_y = min(self.height - 90, title_rect.bottom + 38)
+        prompt_center_y = min(safe_edges(self)[3] - 90, title_rect.bottom + 38)
 
         # Smooth fade prompt
         fade_phase = 0.5 + 0.5 * math.sin(self.time * 0.045)
@@ -226,7 +242,7 @@ class MainMenu:
         self.tutorial_completed = global_data.get("tutorial_completed", False) if global_data else False
 
         if self.tutorial_completed:
-            self.options = ["Jugar", "Tutorial", "Opciones", "Salir"]
+            self.options = ["Jugar", "Bestiario", "Tutorial", "Opciones", "Salir"]
         else:
             self.options = ["Tutorial", "Opciones", "Salir"]
 
@@ -392,7 +408,7 @@ class MainMenu:
             self.notification_timer -= dt_frames
             # Dibujar notificación en la parte inferior
             notif_surf = self.font_md.render(self.notification, True, (255, 255, 100))
-            notif_rect = notif_surf.get_rect(center=(self.width // 2, self.height - 40))
+            notif_rect = notif_surf.get_rect(center=(self.width // 2, safe_edges(self)[3] - 40))
             # Fondo semitransparente
             bg_rect = pygame.Rect(notif_rect.x - 20, notif_rect.y - 10, notif_rect.width + 40, notif_rect.height + 20)
             s = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
@@ -783,9 +799,10 @@ class BestiaryMenu:
         else:
             surface.fill((11, 11, 11))
 
-        # UI Top Left
+        # UI Top Left (anclada al área visible para no recortarse en 'fill')
+        s_left, s_top, s_right, s_bottom = safe_edges(self)
         title = self.font_lg.render("ENEMIGOS", True, (255, 255, 255))
-        surface.blit(title, (40, 40))
+        surface.blit(title, (s_left + 40, s_top + 40))
 
         current_data = self.enemies_data[self.current_index]
         enemy_name_str = current_data["name"]
@@ -869,9 +886,9 @@ class BestiaryMenu:
             desc_text = self.font_sm.render("Aún no has encontrado a este enemigo.", True, (100, 100, 100))
             surface.blit(desc_text, desc_text.get_rect(center=(self.width // 2, desc_y)))
 
-        # Back hint
+        # Back hint (anclada a la esquina inferior izquierda del área visible)
         back_text = self.font_sm.render("ESC para salir", True, (150, 150, 150))
-        surface.blit(back_text, (40, self.height - 40))
+        surface.blit(back_text, (s_left + 40, s_bottom - 40))
 
 class OptionsMenu:
     def __init__(self, width, height, font_lg, font_md, font_sm, global_data=None):
@@ -1113,4 +1130,4 @@ class OptionsMenu:
             surface.blit(text_surf, rect)
 
         help_text = self.font_sm.render("Usa las FLECHAS para moverte y cambiar valores. ENTER para seleccionar.", True, (200, 200, 200))
-        surface.blit(help_text, help_text.get_rect(center=(self.width // 2, self.height - 40)))
+        surface.blit(help_text, help_text.get_rect(center=(self.width // 2, safe_edges(self)[3] - 40)))
