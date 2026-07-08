@@ -32,6 +32,8 @@ DEFAULT_FPS_LIMIT = 60
 FINAL_BOSS_ROOM_ID = "TIP10TEMTT1"
 MINIBOSS_LEVEL_SUFFIX = "boss"
 MINIBOSS_BOSS_LEVEL_KEYS = {"s1", "s4", "s9"}
+DEFEAT_SEQUENCE_FRAMES = 150
+VALID_NODE_STATES = {NodeState.LOCKED, NodeState.UNLOCKED, NodeState.CLEANED}
 
 
 def sanitize_fps_limit(value):
@@ -73,11 +75,10 @@ def apply_display_mode(resolution, fullscreen):
     resolución elegida nunca deforma ni corta el contenido: solo define el tamaño
     real del framebuffer sobre el que se aplica el letterbox 16:9.
 
-    - Pantalla completa: usa el flag SCALED para que SDL escale la resolución lógica
-      pedida a la pantalla física SIN cambiar el modo de video del hardware. Esto es
-      clave: muchos monitores no soportan modos exclusivos distintos al nativo y, al
-      pedírselos, devuelven una superficie basura (p. ej. 800x600) que corta el
-      contenido. Con SCALED get_size() siempre coincide con la resolución pedida.
+    - Pantalla completa: usa el tamano real del escritorio para que el calculo
+      de fit/fill se haga con la relacion de aspecto del monitor. Esto evita que
+      una resolucion guardada antigua (por ejemplo 800x600) provoque recortes
+      excesivos antes de que SDL escale a la pantalla fisica.
     - Ventana: limita la resolución pedida al área útil del escritorio (descontando
       barra de título y barra de tareas) para que la ventana no quede fuera de pantalla.
     """
@@ -85,8 +86,9 @@ def apply_display_mode(resolution, fullscreen):
     req_h = int(resolution[1]) if resolution else HEIGHT
 
     if fullscreen:
+        desktop_w, desktop_h = get_desktop_size()
         try:
-            return pygame.display.set_mode((req_w, req_h), pygame.FULLSCREEN | pygame.SCALED)
+            return pygame.display.set_mode((desktop_w, desktop_h), pygame.FULLSCREEN | pygame.SCALED)
         except pygame.error:
             try:
                 return pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -211,6 +213,96 @@ def draw_centered_text_fit(surface, text, font, center, color, max_width, antial
     return text_rect
 
 
+def draw_defeat_sequence(surface, player, camera_x, camera_y, timer, total_frames):
+    if not player or timer <= 0:
+        return
+
+    total = max(1, total_frames)
+    elapsed = total - max(0, timer)
+    progress = max(0.0, min(1.0, elapsed / total))
+    pixel = 8
+    block = 16
+
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((24, 0, 8, int(58 + 48 * progress)))
+
+    # Scanlines discretas y quietas: efecto de derrota sin romper el estilo pixel-art.
+    for y in range(0, HEIGHT, block * 3):
+        pygame.draw.rect(overlay, (86, 0, 22, 18), (0, y, WIDTH, pixel))
+
+    for i in range(4):
+        y = (120 + i * 96 + (elapsed // 18 % 2) * pixel) % HEIGHT
+        x = 90 + i * 250
+        w = 80 + (i % 2) * 48
+        pygame.draw.rect(overlay, (135, 18, 34, 28), (x, y - (y % pixel), w, pixel))
+
+    center_x = int(player.x + camera_x)
+    center_y = int(player.y + camera_y)
+    center_x -= center_x % pixel
+    center_y -= center_y % pixel
+
+    # Pulso principal: diamantes escalonados en vez de circulos suaves.
+    def draw_diamond_ring(radius, color):
+        radius = max(pixel, (radius // pixel) * pixel)
+        for dy in range(-radius, radius + pixel, pixel * 2):
+            span = radius - abs(dy)
+            for sx in (-span, span):
+                pygame.draw.rect(overlay, color, (center_x + sx - pixel // 2, center_y + dy - pixel // 2, pixel, pixel))
+        for dx in range(-radius, radius + pixel, pixel * 2):
+            span = radius - abs(dx)
+            for sy in (-span, span):
+                pygame.draw.rect(overlay, color, (center_x + dx - pixel // 2, center_y + sy - pixel // 2, pixel, pixel))
+
+    ring_a = int(24 + progress * 72)
+    ring_b = 16 + ((elapsed // 12) % 3) * pixel
+    draw_diamond_ring(ring_a, (210, 42, 52, max(28, int(120 * (1.0 - progress)))))
+    draw_diamond_ring(ring_b, (255, 165, 105, 70))
+
+    # Fragmentos cuadrados controlados, con direcciones fijas para no verse organico.
+    directions = [
+        (-1, 0), (1, 0), (0, -1), (0, 1),
+        (-1, -1), (1, -1), (-1, 1), (1, 1),
+    ]
+    for i, (dx, dy) in enumerate(directions):
+        length = max(1.0, math.hypot(dx, dy))
+        dist = int((16 + progress * (34 + (i % 3) * 8)) // pixel) * pixel
+        px = center_x + int(dx / length * dist)
+        py = center_y + int(dy / length * dist)
+        px -= px % pixel
+        py -= py % pixel
+        size = pixel
+        alpha = max(30, int(140 * (1.0 - progress * 0.6)))
+        color = (225, 54 + (i % 2) * 26, 50, alpha)
+        pygame.draw.rect(overlay, color, (px, py, size, size))
+
+    # Marca final sobre el jugador: una X hecha de bloques.
+    for offset in range(-16, 17, pixel):
+        pygame.draw.rect(overlay, (235, 180, 125, 120), (center_x + offset, center_y + offset, pixel, pixel))
+        pygame.draw.rect(overlay, (220, 54, 58, 145), (center_x + offset, center_y - offset, pixel, pixel))
+
+    surface.blit(overlay, (0, 0))
+
+    title = font_lg.render("HAS MUERTO", False, (255, 92, 92))
+    shadow = font_lg.render("HAS MUERTO", False, (45, 0, 0))
+    subtitle = font_md.render("Regresando al mapa...", False, (245, 225, 225))
+
+    panel_w = min(WIDTH - 80, max(560, title.get_width() + 72, subtitle.get_width() + 64))
+    panel_h = 102
+    panel_x = WIDTH // 2 - panel_w // 2
+    panel_y = HEIGHT // 3 - 48
+    pygame.draw.rect(surface, (20, 5, 10), (panel_x, panel_y, panel_w, panel_h))
+    pygame.draw.rect(surface, (104, 24, 34), (panel_x, panel_y, panel_w, pixel))
+    pygame.draw.rect(surface, (104, 24, 34), (panel_x, panel_y + panel_h - pixel, panel_w, pixel))
+    pygame.draw.rect(surface, (104, 24, 34), (panel_x, panel_y, pixel, panel_h))
+    pygame.draw.rect(surface, (104, 24, 34), (panel_x + panel_w - pixel, panel_y, pixel, panel_h))
+
+    title_rect = title.get_rect(center=(WIDTH // 2, panel_y + 38))
+    surface.blit(shadow, (title_rect.x + pixel, title_rect.y + pixel))
+    surface.blit(title, title_rect)
+
+    subtitle_rect = subtitle.get_rect(center=(WIDTH // 2, panel_y + 76))
+    surface.blit(subtitle, subtitle_rect)
+
 def get_viewport_transform(target_size, aspect_mode="fit"):
     target_w, target_h = target_size
     if target_w <= 0 or target_h <= 0:
@@ -225,6 +317,22 @@ def get_viewport_transform(target_size, aspect_mode="fit"):
     offset_x = (target_w - scaled_w) // 2
     offset_y = (target_h - scaled_h) // 2
     return scale, offset_x, offset_y, scaled_w, scaled_h
+
+
+def get_visible_virtual_rect(target_size, aspect_mode="fit"):
+    scale, offset_x, offset_y, _, _ = get_viewport_transform(target_size, aspect_mode)
+    if scale <= 0:
+        return pygame.Rect(0, 0, WIDTH, HEIGHT)
+
+    target_w, target_h = target_size
+    left = max(0, int(math.ceil((0 - offset_x) / scale)))
+    top = max(0, int(math.ceil((0 - offset_y) / scale)))
+    right = min(WIDTH, int(math.floor((target_w - offset_x) / scale)))
+    bottom = min(HEIGHT, int(math.floor((target_h - offset_y) / scale)))
+
+    if right <= left or bottom <= top:
+        return pygame.Rect(0, 0, WIDTH, HEIGHT)
+    return pygame.Rect(left, top, right - left, bottom - top)
 
 
 def window_to_virtual(pos, target_size, aspect_mode="fit"):
@@ -338,45 +446,62 @@ def draw_energy_crystal(surface, cx, cy, filled):
         pygame.draw.rect(surface, hi, (cx - px, top + px, px, px))
 
 
-def draw_map_hud(surface, semester, par, energy, max_energy):
-    """HUD superior del mapa: barra plana pixel-art con bordes duros. Misma informacion."""
-    HUD_H = 104
-    # relleno plano en 2 tonos duros (sin degradado)
-    pygame.draw.rect(surface, (26, 22, 36), (0, 0, WIDTH, HUD_H))
-    pygame.draw.rect(surface, (20, 16, 28), (0, HUD_H - 24, WIDTH, 24))
-    pygame.draw.line(surface, (60, 52, 82), (0, 0), (WIDTH, 0))            # highlight superior 1px
-    # borde inferior duro: oscuro (4px) + acento (1px)
-    pygame.draw.rect(surface, (10, 8, 16), (0, HUD_H - 4, WIDTH, 4))
-    pygame.draw.line(surface, MAP_UI["accent"], (0, HUD_H - 5), (WIDTH, HUD_H - 5))
+def draw_map_hud(surface, semester, par, energy, max_energy, view=None):
+    """HUD superior del mapa: barra plana pixel-art con bordes duros.
 
-    surface.blit(font_md.render("MALLA CURRICULAR", False, MAP_UI["accent"]), (24, 14))
-    surface.blit(font_sm.render("Mapa DAG - grafo de materias", False, MAP_UI["text_dim"]), (24, 46))
+    Se ancla al área realmente visible (`view`) para que en modo 'fill' —que
+    recorta los bordes de la superficie virtual— la barra no quede cortada.
+    Los ejes X se reanclan proporcionalmente al ancho visible; el eje Y solo se
+    desplaza hacia el borde superior visible.
+    """
+    HUD_H = 104
+    left = view.left if view else 0
+    top = view.top if view else 0
+    right = view.right if view else WIDTH
+    w = max(1, right - left)
+
+    def X(x):  # coord de diseño (0..WIDTH) -> reanclada al ancho visible
+        return left + x * w // WIDTH
+
+    def Y(y):  # coord de diseño (0..HUD_H) -> desplazada al borde superior visible
+        return top + y
+
+    # relleno plano en 2 tonos duros (sin degradado)
+    pygame.draw.rect(surface, (26, 22, 36), (left, top, w, HUD_H))
+    pygame.draw.rect(surface, (20, 16, 28), (left, Y(HUD_H - 24), w, 24))
+    pygame.draw.line(surface, (60, 52, 82), (left, top), (right, top))            # highlight superior 1px
+    # borde inferior duro: oscuro (4px) + acento (1px)
+    pygame.draw.rect(surface, (10, 8, 16), (left, Y(HUD_H - 4), w, 4))
+    pygame.draw.line(surface, MAP_UI["accent"], (left, Y(HUD_H - 5)), (right, Y(HUD_H - 5)))
+
+    surface.blit(font_md.render("MALLA CURRICULAR", False, MAP_UI["accent"]), (X(24), Y(14)))
+    surface.blit(font_sm.render("Mapa DAG - grafo de materias", False, MAP_UI["text_dim"]), (X(24), Y(46)))
 
     def stat(cx, label, value_str):
         lab = font_sm.render(label, False, MAP_UI["text_dim"])
-        surface.blit(lab, lab.get_rect(center=(cx, 26)))
+        surface.blit(lab, lab.get_rect(center=(X(cx), Y(26))))
         val = font_md.render(value_str, False, MAP_UI["text"])
-        surface.blit(val, val.get_rect(center=(cx, 50)))
+        surface.blit(val, val.get_rect(center=(X(cx), Y(50))))
 
     # divisores duros (2px: oscuro + claro)
     for dx in (690, 862):
-        pygame.draw.line(surface, (12, 10, 18), (dx, 16), (dx, 62))
-        pygame.draw.line(surface, (60, 52, 82), (dx + 1, 16), (dx + 1, 62))
+        pygame.draw.line(surface, (12, 10, 18), (X(dx), Y(16)), (X(dx), Y(62)))
+        pygame.draw.line(surface, (60, 52, 82), (X(dx) + 1, Y(16)), (X(dx) + 1, Y(62)))
     stat(610, "SEMESTRE", str(semester))
     stat(776, "TIEMPO RECORD", str(par))
 
     # Energia como gemas pixeladas
     lab = font_sm.render("ENERGIA", False, MAP_UI["text_dim"])
-    surface.blit(lab, lab.get_rect(center=(1040, 24)))
+    surface.blit(lab, lab.get_rect(center=(X(1040), Y(24))))
     gap = 22
     total = max(1, max_energy) * gap
-    sx = 1040 - total // 2 + gap // 2
+    sx = X(1040) - total // 2 + gap // 2
     for i in range(max_energy):
-        draw_energy_crystal(surface, sx + i * gap, 52, i < energy)
+        draw_energy_crystal(surface, sx + i * gap, Y(52), i < energy)
 
     controls = "WASD Mover   -   Flechas/Mouse Disparar   -   ENTER Entrar   -   ESPACIO Descansar"
     cs = font_sm.render(controls, False, MAP_UI["text_dim"])
-    surface.blit(cs, cs.get_rect(center=(WIDTH // 2, 84)))
+    surface.blit(cs, cs.get_rect(center=(X(WIDTH // 2), Y(84))))
 
 
 def draw_selection_highlight(surface, rect):
@@ -487,12 +612,23 @@ def main():
     last_mouse_pos = (0, 0)
     selected_node = None
 
+    def map_view_rect():
+        """Zona de la superficie virtual que realmente se ve tras el fit/fill.
+
+        En modo 'fit' es todo 1280x720; en 'fill' es más pequeña porque el
+        escalado recorta los bordes. La cámara y el HUD del mapa se anclan a esta
+        zona para que ningún nodo ni el HUD queden fuera de pantalla en 'fill'.
+        """
+        return get_visible_virtual_rect(real_screen.get_size(), aspect_mode)
+
     def clamp_map_camera(cx, cy):
         """Limita el desplazamiento de la cámara para no arrastrar el mapa al vacío.
 
         Solo afecta a la cámara (offset de dibujo); no cambia posiciones de nodos,
         aristas ni hitboxes. Se permite un margen para poder ver los bordes del mapa
-        con algo de aire, pero no desplazarse indefinidamente.
+        con algo de aire, pero no desplazarse indefinidamente. Los límites se calculan
+        sobre el área realmente visible (map_view_rect) para que el modo 'fill' no
+        recorte los nodos de las orillas.
         """
         rooms = map_gen.rooms
         if not rooms:
@@ -502,26 +638,73 @@ def main():
         min_y = min(r.rect.top for r in rooms.values())
         max_y = max(r.rect.bottom for r in rooms.values())
         pad = 140      # aire permitido más allá de los bordes del mapa
-        hud_top = 104  # franja superior que tapa el HUD del mapa
+        hud_h = 104    # franja del HUD superior dentro del área visible
+
+        view = map_view_rect()
+        view_left, view_right = view.left, view.right
+        view_bottom = view.bottom
+        view_w = view_right - view_left
+        usable_top = view.top + hud_h   # borde inferior del HUD, ya dentro del área visible
 
         # Eje X: si el mapa cabe a lo ancho se mantiene casi centrado (con holgura pad).
-        if (max_x - min_x) <= WIDTH:
-            center_cx = (WIDTH - (min_x + max_x)) / 2
+        if (max_x - min_x) <= view_w:
+            center_cx = (view_left + view_right - min_x - max_x) / 2
             cx_min, cx_max = center_cx - pad, center_cx + pad
         else:
-            cx_min, cx_max = WIDTH - max_x - pad, -min_x + pad
+            cx_min, cx_max = view_right - max_x - pad, view_left - min_x + pad
 
         # Eje Y: se considera el HUD para que la PRIMERA fila pueda bajar por debajo
-        # de él y verse completa. El área útil vertical va de hud_top a HEIGHT.
-        usable_h = HEIGHT - hud_top
+        # de él y verse completa. El área útil vertical va de usable_top a view_bottom.
+        usable_h = view_bottom - usable_top
         if (max_y - min_y) <= usable_h:
-            center_cy = (hud_top + HEIGHT) / 2 - (min_y + max_y) / 2
+            center_cy = (usable_top + view_bottom) / 2 - (min_y + max_y) / 2
             cy_min, cy_max = center_cy - pad, center_cy + pad
         else:
-            cy_min = HEIGHT - pad - max_y
-            cy_max = hud_top + pad - min_y
+            cy_min = view_bottom - pad - max_y
+            cy_max = usable_top + pad - min_y
 
         return max(cx_min, min(cx_max, cx)), max(cy_min, min(cy_max, cy))
+
+    def coerce_int(value, fallback, minimum=None, maximum=None):
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            parsed = fallback
+        if minimum is not None:
+            parsed = max(minimum, parsed)
+        if maximum is not None:
+            parsed = min(maximum, parsed)
+        return parsed
+
+    def normalize_engine_state(target_engine, saved_state):
+        normalized = dict(target_engine.state)
+        if isinstance(saved_state, dict):
+            for node in target_engine.nodes:
+                state = saved_state.get(node)
+                if state in VALID_NODE_STATES:
+                    normalized[node] = state
+        target_engine.state = normalized
+        target_engine.update_unlocks()
+
+    def load_saved_game_data(data):
+        nonlocal engine, map_gen, par_score, semester_counter, energy, max_energy, camera_x, camera_y, selected_node
+        if not isinstance(data, dict):
+            return False
+
+        loaded_engine = DagEngine()
+        normalize_engine_state(loaded_engine, data.get("nodes_state"))
+        engine = loaded_engine
+        map_gen = MapGenerator(engine)
+        par_score = engine.get_par_score()
+
+        semester_counter = coerce_int(data.get("semester_counter"), 1, minimum=1)
+        max_energy = coerce_int(data.get("max_energy"), 6, minimum=1)
+        energy = coerce_int(data.get("energy"), max_energy, minimum=0, maximum=max_energy)
+        camera_x = coerce_int(data.get("camera_x"), 0)
+        camera_y = coerce_int(data.get("camera_y"), 0)
+        camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
+        selected_node = None
+        return True
 
     current_room = None
     combat_player = None
@@ -725,7 +908,18 @@ def main():
             enemies.append(spawn_enemy(Boss, [(world_w // 2, 140)]))
         if is_miniboss_room(current_room) and max_waves == 1:
             enemies.append(spawn_enemy(MiniBoss, [(world_w // 2, world_h // 3)]))
+
+    def begin_level_failure():
+        nonlocal level_failed_timer
+        if level_failed_timer > 0 or level_failed_done:
+            return
+        if combat_player:
+            combat_player.hp = 0
+            combat_player.state = 0
+        level_failed_timer = DEFEAT_SEQUENCE_FRAMES
+
     load_room_level(None)
+
     last_click_time = 0
     last_clicked_node = None
     map_message = ""
@@ -765,8 +959,9 @@ def main():
             if unlocked:
                 selected_node = unlocked[0]
                 if selected_node in map_gen.rooms:
-                    camera_x = WIDTH//2 - map_gen.rooms[selected_node].rect.centerx
-                    camera_y = HEIGHT//2 - map_gen.rooms[selected_node].rect.centery
+                    _mv = map_view_rect()
+                    camera_x = _mv.centerx - map_gen.rooms[selected_node].rect.centerx
+                    camera_y = (_mv.top + 104 + _mv.bottom)//2 - map_gen.rooms[selected_node].rect.centery
                     camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
 
         for event in pygame.event.get():
@@ -806,15 +1001,8 @@ def main():
                 if action == "Continuar Partida":
                     slot = save_mgr.get_latest_slot()
                     data = save_mgr.load_game(slot)
-                    if data:
+                    if data and load_saved_game_data(data):
                         current_slot = slot
-                        semester_counter = data["semester_counter"]
-                        energy = data["energy"]
-                        max_energy = data["max_energy"]
-                        camera_x = data["camera_x"]
-                        camera_y = data["camera_y"]
-                        camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
-                        engine.state = data["nodes_state"]
                         trigger_transition("MAP", "CIRCLE", 0.04)
                     else:
                         main_menu.notification = "No hay partida guardada."
@@ -855,15 +1043,8 @@ def main():
                         trigger_transition("MAP", "CIRCLE", 0.04)
                     elif current_slot_mode == "CARGAR":
                         data = save_mgr.load_game(slot)
-                        if data:
+                        if data and load_saved_game_data(data):
                             current_slot = slot
-                            semester_counter = data["semester_counter"]
-                            energy = data["energy"]
-                            max_energy = data["max_energy"]
-                            camera_x = data["camera_x"]
-                            camera_y = data["camera_y"]
-                            camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
-                            engine.state = data["nodes_state"]
                             trigger_transition("MAP", "CIRCLE", 0.04)
             elif game_state == "PAUSE":
                 action = pause_menu.handle_event(event, mouse_x, mouse_y)
@@ -997,11 +1178,16 @@ def main():
                             if best_node:
                                 selected_node = best_node
                                 target_room = map_gen.rooms[selected_node]
-                                camera_x = WIDTH//2 - target_room.rect.centerx
-                                camera_y = HEIGHT//2 - target_room.rect.centery
+                                _mv = map_view_rect()
+                                camera_x = _mv.centerx - target_room.rect.centerx
+                                camera_y = (_mv.top + 104 + _mv.bottom)//2 - target_room.rect.centery
                                 camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
 
             elif game_state == "COMBAT":
+                combat_defeat_active = combat_player and (combat_player.hp <= 0 or level_failed_timer > 0)
+                if combat_defeat_active and not editor_mode:
+                    continue
+
                 if editor_mode:
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
                         dragging = True
@@ -1024,7 +1210,13 @@ def main():
                 # Disparar con el ratón
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
-            elif game_state in ["WIN", "GAME_OVER"]:
+            elif game_state == "WIN":
+                if event.type == pygame.KEYDOWN:
+                    save_mgr.delete_save(current_slot)
+                    main_menu.notification = "¡Nuevo enemigo desbloqueado! La experiencia es rejugable."
+                    main_menu.notification_timer = 300
+                    trigger_transition("MAIN_MENU", "FADE", 0.05)
+            elif game_state == "GAME_OVER":
                 if event.type == pygame.KEYDOWN and (event.key == pygame.K_r or event.key == pygame.K_SPACE):
                     main()
                     return
@@ -1042,7 +1234,15 @@ def main():
                     finish_tutorial()
             elif game_state == "COMBAT":
                 world_w, world_h = combat_world_size()
-                if not editor_mode:
+                if combat_player and combat_player.hp <= 0 and not level_failed_done:
+                    begin_level_failure()
+
+                if level_failed_timer > 0:
+                    level_failed_timer -= 1
+                    if level_failed_timer == 0:
+                        level_failed_done = True
+                        trigger_transition("MAP", "CIRCLE", 0.04)
+                elif not editor_mode:
                     # Disparar con flechas (soporta diagonales)
                     dx, dy = 0, 0
                     if keys[pygame.K_UP]: dy -= 1
@@ -1168,14 +1368,7 @@ def main():
                                     trigger_transition("MAP", "CIRCLE", 0.04)
 
                     if combat_player.hp <= 0:
-                        if level_failed_timer == 0 and not level_failed_done:
-                            level_failed_timer = 120 # 2 segundos
-
-                        if level_failed_timer > 0:
-                            level_failed_timer -= 1
-                            if level_failed_timer == 0:
-                                level_failed_done = True
-                                trigger_transition("MAP", "CIRCLE", 0.04)
+                        begin_level_failure()
 
             # Temporizadores de UI a 60 Hz (independientes del FPS de render).
             if rest_animation_timer > 0:
@@ -1218,7 +1411,9 @@ def main():
                 draw_subject_tooltip(screen, engine, selected_node, sel_rect)
 
             # HUD superior del mapa (panel pixel-art con cristales de energia).
-            draw_map_hud(screen, semester_counter, par_score, energy, max_energy)
+            # Se ancla al área visible para no recortarse en modo 'fill'.
+            draw_map_hud(screen, semester_counter, par_score, energy, max_energy,
+                         get_visible_virtual_rect(real_screen.get_size(), aspect_mode))
 
             # Animación de descanso (el contador se decrementa en la simulación a 60 Hz)
             if rest_animation_timer > 0:
@@ -1317,29 +1512,36 @@ def main():
                         info_y += text_surf.get_height() + 8
 
             # UI de Combate - Panel superior
+            combat_ui_rect = get_visible_virtual_rect(real_screen.get_size(), aspect_mode)
+            ui_left = combat_ui_rect.left
+            ui_right = combat_ui_rect.right
+            ui_top = combat_ui_rect.top
+            ui_margin = 15
+
             hud_rect = pygame.Surface((WIDTH, 60))
             hud_rect.set_alpha(180)
             hud_rect.fill((10, 10, 10))
-            screen.blit(hud_rect, (0, 0))
-            pygame.draw.line(screen, (150, 150, 150), (0, 60), (WIDTH, 60), 2)
+            screen.blit(hud_rect, (0, ui_top))
+            pygame.draw.line(screen, (150, 150, 150), (0, ui_top + 60), (WIDTH, ui_top + 60), 2)
 
-            # Dibujar barra de vida gráfica del jugador (Top-Left)
+            # Dibujar barra de vida grafica del jugador (Top-Left)
+            life_right = ui_left + ui_margin
             if HEART_FRAMES and len(HEART_FRAMES) == 5:
                 max_hearts = 7
                 hp_per_heart = combat_player.max_hp / max_hearts
 
-                # Suavizar la animación de pérdida de vida
+                # Suavizar la animacion de perdida de vida
                 if not hasattr(combat_player, 'display_hp'):
                     combat_player.display_hp = combat_player.hp
                 if combat_player.display_hp > combat_player.hp:
-                    combat_player.display_hp -= 2.0  # Animación rápida
+                    combat_player.display_hp -= 2.0  # Animacion rapida
                 elif combat_player.display_hp < combat_player.hp:
                     combat_player.display_hp = combat_player.hp
 
                 current_hp = combat_player.display_hp
 
-                bar_x = 15
-                bar_y = 15
+                bar_x = ui_left + ui_margin
+                bar_y = ui_top + 15
                 for i in range(max_hearts):
                     heart_hp = current_hp - (i * hp_per_heart)
                     heart_hp = max(0, min(hp_per_heart, heart_hp))
@@ -1347,13 +1549,15 @@ def main():
                     frame_idx = int(round(fraction * 4)) # 0 a 4 (5 fotogramas)
                     frame_idx = max(0, min(4, frame_idx))
 
-                    screen.blit(HEART_FRAMES[frame_idx], (bar_x + i * 32, bar_y)) # Separación ajustada (32px)
+                    screen.blit(HEART_FRAMES[frame_idx], (bar_x + i * 32, bar_y)) # Separacion ajustada (32px)
+                life_right = bar_x + max_hearts * 32
             else:
                 hp_text = font_md.render("Vida:", False, (255, 255, 255))
-                screen.blit(hp_text, (15, 15))
+                hp_x = ui_left + ui_margin
+                screen.blit(hp_text, (hp_x, ui_top + 15))
 
-                bar_x = 15 + hp_text.get_width() + 10
-                bar_y = 18
+                bar_x = hp_x + hp_text.get_width() + 10
+                bar_y = ui_top + 18
                 bar_w = 200
                 bar_h = 24
 
@@ -1362,11 +1566,12 @@ def main():
                 pygame.draw.rect(screen, (255, 50, 50), (bar_x, bar_y, bar_w * hp_ratio, bar_h)) # Relleno de vida
                 pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 2) # Borde de la barra
 
-                # Texto de vida numérico
+                # Texto de vida numerico
                 hp_num = font_sm.render(f"{max(0, int(combat_player.hp))}/{combat_player.max_hp}", False, (255, 255, 255))
                 screen.blit(hp_num, (bar_x + bar_w//2 - hp_num.get_width()//2, bar_y + 2))
+                life_right = bar_x + bar_w
 
-            # Título de la sala (Top-Right)
+            # Titulo de la sala (Top-Right)
             room_name = engine.subjects[current_room]['name']
             title = f"Limpiando: {room_name}"
             title_color = (255, 255, 255)
@@ -1375,10 +1580,10 @@ def main():
                 title += " [CAMINO CRITICO]"
                 title_color = engine.node_colors.get(current_room, (255, 100, 100))
 
-            room_ts = font_md.render(title, False, title_color)
-            # Alineado a la derecha para no chocar con la barra de vida
-            screen.blit(room_ts, (WIDTH - room_ts.get_width() - 20, 15))
-
+            room_ts_max_w = max(120, ui_right - life_right - 40)
+            room_ts = render_text_fit(font_md, title, title_color, room_ts_max_w, antialias=False)
+            room_x = max(life_right + 20, ui_right - room_ts.get_width() - 20)
+            screen.blit(room_ts, (room_x, ui_top + 15))
             if current_wave == max_waves and not enemies and level_passed_timer > 0:
                 msg_surf = font_lg.render("¡NIVEL SUPERADO!", True, (100, 255, 100))
                 msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT // 3))
@@ -1387,21 +1592,10 @@ def main():
                 screen.blit(shadow_surf, (msg_rect.x + 3, msg_rect.y + 3))
                 screen.blit(msg_surf, msg_rect)
 
-            if combat_player.hp <= 0 and level_failed_timer > 0:
-                msg_surf = font_lg.render("¡HAS SIDO DERROTADO!", True, (255, 100, 100))
-                msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT // 3))
-                # Text shadow
-                shadow_surf = font_lg.render("¡HAS SIDO DERROTADO!", True, (50, 0, 0))
-                screen.blit(shadow_surf, (msg_rect.x + 3, msg_rect.y + 3))
-                screen.blit(msg_surf, msg_rect)
+            if level_failed_timer > 0:
+                draw_defeat_sequence(screen, combat_player, combat_cam_x, combat_cam_y, level_failed_timer, DEFEAT_SEQUENCE_FRAMES)
 
         elif game_state == "WIN":
-            if event.type == pygame.KEYDOWN:
-                save_mgr.delete_save(current_slot)
-                main_menu.notification = "¡Nuevo enemigo desbloqueado! La experiencia es rejugable."
-                main_menu.notification_timer = 300
-                trigger_transition("MAIN_MENU", "FADE", 0.05)
-
             draw_centered_text_fit(
                 screen,
                 f"¡PROYECTO DE TITULACION APROBADO! ¡HAS GANADO!",
