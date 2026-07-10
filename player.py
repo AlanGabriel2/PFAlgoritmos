@@ -1,6 +1,7 @@
 import pygame
 import math
 import random
+import audio
 
 font_bullet = None
 BULLET_0_IMG = None
@@ -102,12 +103,14 @@ class Player:
             self.bullets.append(Bullet(self.x, self.y, angle))
             self.shoot_cooldown = 15
             self.state = 2 # Attack
+            audio.play_sfx("shoot")
 
     def shoot_angle(self, angle):
         if self.shoot_cooldown == 0:
             self.bullets.append(Bullet(self.x, self.y, angle))
             self.shoot_cooldown = 15
             self.state = 2 # Attack
+            audio.play_sfx("shoot")
 
     def update_bullets(self, width, height):
         if self.shoot_cooldown > 0:

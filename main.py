@@ -15,7 +15,10 @@ from level import DEFAULT_HAZARD_DAMAGE, DEFAULT_HAZARD_DAMAGE_COOLDOWN, load_co
 from collision_editor import CollisionEditor
 from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu
 from tutorial import TutorialState
+import audio
 
+# Buffer chico (512) para que los efectos suenen sin retraso perceptible.
+pygame.mixer.pre_init(44100, -16, 2, 512)
 pygame.init()
 
 # Configurar Pantalla
@@ -595,6 +598,9 @@ def main():
     global screen, real_screen
     clock = pygame.time.Clock()
 
+    audio.init(global_data.get("volume", 100), global_data.get("music_volume", 100))
+    audio.play_music("menu")
+
     # Inicializar Sistemas del Juego
     engine = DagEngine()
     map_gen = MapGenerator(engine)
@@ -767,6 +773,26 @@ def main():
         "old_surf": None
     }
 
+    def music_candidates_for(target):
+        """Pistas de música para cada estado, en orden de preferencia (fallbacks).
+
+        None significa "mantener la música actual" (pausa, opciones, bestiario...),
+        de modo que esas pantallas no interrumpen la ambientación de fondo.
+        """
+        if target in ("DISCLAIMER_SCREEN", "TITLE_SCREEN", "MAIN_MENU"):
+            return ("menu",)
+        if target == "MAP":
+            return ("map", "menu")
+        if target == "COMBAT":
+            if current_room == FINAL_BOSS_ROOM_ID:
+                return ("boss_final", "boss", "combat", "map", "menu")
+            if is_miniboss_room(current_room):
+                return ("boss", "combat", "map", "menu")
+            return ("combat", "map", "menu")
+        if target == "WIN":
+            return ("win", "menu")
+        return None
+
     def trigger_transition(target, t_type="FADE", speed=0.04):
         nonlocal game_state
         trans_state["active"] = True
@@ -775,6 +801,17 @@ def main():
         trans_state["type"] = t_type
         trans_state["old_surf"] = screen.copy()
         game_state = target
+        candidates = music_candidates_for(target)
+        if candidates:
+            audio.play_music(*candidates)
+        audio.set_music_duck(target == "PAUSE")
+
+    def ui_action(menu_obj, event, *args):
+        """handle_event de un menú + click sonoro cuando el jugador acciona algo."""
+        action = menu_obj.handle_event(event, *args)
+        if action and event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+            audio.play_sfx("click")
+        return action
 
     def finish_tutorial():
         global_data["tutorial_completed"] = True
@@ -868,6 +905,7 @@ def main():
 
         damage = strongest_hit["damage"]
         combat_player.hp -= damage
+        audio.play_sfx("hurt")
         player_hazard_cooldown = positive_int(
             strongest_hit["data"].get("damage_cooldown"),
             DEFAULT_HAZARD_DAMAGE_COOLDOWN,
@@ -948,6 +986,7 @@ def main():
             combat_player.hp = 0
             combat_player.state = 0
         level_failed_timer = DEFEAT_SEQUENCE_FRAMES
+        audio.play_sfx("level_failed")
 
     load_room_level(None)
 
@@ -1022,13 +1061,13 @@ def main():
                 debug_enemy_paths = not debug_enemy_paths
 
             if game_state == "TITLE_SCREEN":
-                action = title_screen.handle_event(event, mouse_x, mouse_y)
+                action = ui_action(title_screen, event, mouse_x, mouse_y)
                 if action == "START":
                     main_menu.time = 0
                     trigger_transition("MAIN_MENU", "FADE", 0.03)
 
             elif game_state == "MAIN_MENU":
-                action = main_menu.handle_event(event, mouse_x, mouse_y)
+                action = ui_action(main_menu, event, mouse_x, mouse_y)
                 if action == "Continuar Partida":
                     slot = save_mgr.get_latest_slot()
                     data = save_mgr.load_game(slot)
@@ -1058,7 +1097,7 @@ def main():
                 elif action == "Salir":
                     running = False
             elif game_state == "SLOT_SELECT":
-                action = slot_select_menu.handle_event(event, mouse_x, mouse_y)
+                action = ui_action(slot_select_menu, event, mouse_x, mouse_y)
                 if action == "Regresar":
                     trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
                 elif action and action.startswith("Slot"):
@@ -1078,7 +1117,7 @@ def main():
                             current_slot = slot
                             trigger_transition("MAP", "CIRCLE", 0.04)
             elif game_state == "PAUSE":
-                action = pause_menu.handle_event(event, mouse_x, mouse_y)
+                action = ui_action(pause_menu, event, mouse_x, mouse_y)
                 if action == "Continuar":
                     trigger_transition(previous_state, "FADE", 0.08)
                 elif action == "Opciones":
@@ -1091,7 +1130,7 @@ def main():
                     save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
                     trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
             elif game_state == "BESTIARY":
-                action = bestiary_menu.handle_event(event, mouse_x, mouse_y)
+                action = ui_action(bestiary_menu, event, mouse_x, mouse_y)
                 if action == "BACK":
                     if previous_state == "TUTORIAL":
                         tutorial_state.phase = 4 # TutorialPhase.OUTRO
@@ -1100,7 +1139,7 @@ def main():
                     else:
                         trigger_transition("MAIN_MENU", "SLIDE_RIGHT", 0.05)
             elif game_state == "TUTORIAL":
-                action = tutorial_state.handle_event(event, mouse_x, mouse_y)
+                action = ui_action(tutorial_state, event, mouse_x, mouse_y)
                 if action == "GO_TO_BESTIARY":
                     main_menu.unlock_bestiary()
                     previous_state = "TUTORIAL"
@@ -1109,7 +1148,7 @@ def main():
                     finish_tutorial()
 
             elif game_state == "OPTIONS":
-                action = options_menu.handle_event(event, mouse_x, mouse_y)
+                action = ui_action(options_menu, event, mouse_x, mouse_y)
                 if action:
                     if action["action"] == "BACK":
                         trigger_transition(options_return_state, "SLIDE_RIGHT" if options_return_state == "MAIN_MENU" else "FADE", 0.05)
@@ -1127,6 +1166,7 @@ def main():
                         global_data["music_volume"] = action.get("mus_vol", global_data.get("music_volume", 100))
                         global_data["fps_limit"] = fps_limit
                         save_mgr.save_global_save(global_data)
+                        audio.set_volumes(gen_vol, global_data["music_volume"])
 
                         # La ventana se recrea de forma robusta; la logica interna se
                         # mantiene en 1280x720 y solo cambia el escalado final (letterbox).
@@ -1136,6 +1176,7 @@ def main():
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     previous_state = "MAP"
                     pause_menu.set_context(in_combat=False)
+                    audio.play_sfx("pause")
                     trigger_transition("PAUSE", "FADE", 0.08)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 3: # Clic derecho para arrastrar
@@ -1237,6 +1278,7 @@ def main():
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     previous_state = "COMBAT"
                     pause_menu.set_context(in_combat=True)
+                    audio.play_sfx("pause")
                     trigger_transition("PAUSE", "FADE", 0.08)
                 # Disparar con el ratón
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -1306,18 +1348,21 @@ def main():
                         if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
                             combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
                             enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
+                            audio.play_sfx("hurt")
 
                         # El jugador recibe daño por balas enemigas
                         for b in enemy.bullets[:]:
                             dist = math.hypot(combat_player.x - b.x, combat_player.y - b.y)
                             if dist < (combat_player.radius + b.radius):
                                 combat_player.hp -= 15
+                                audio.play_sfx("hurt")
                                 if b in enemy.bullets:
                                     enemy.bullets.remove(b)
 
                         if hasattr(enemy, "collect_area_damage_events"):
                             for hit in enemy.collect_area_damage_events(combat_player):
                                 combat_player.hp -= hit["damage"]
+                                audio.play_sfx("hurt")
                                 floating_texts.append({
                                     "text": str(hit["damage"]),
                                     "x": hit["x"],
@@ -1332,6 +1377,7 @@ def main():
                             if e.collides_with_bullet(b):
                                 damage = 10
                                 e.hp -= damage
+                                audio.play_sfx("hit")
 
                                 # Generar texto flotante de daño
                                 floating_texts.append({
@@ -1346,6 +1392,7 @@ def main():
                                     combat_player.bullets.remove(b)
                                 if e.hp <= 0:
                                     enemies.remove(e)
+                                    audio.play_sfx("enemy_die")
 
                     # Actualizar textos flotantes
                     for ft in floating_texts[:]:
@@ -1377,6 +1424,7 @@ def main():
                     if current_wave == max_waves and not enemies:
                         if level_passed_timer == 0 and not level_passed_done:
                             level_passed_timer = 120 # 2 segundos
+                            audio.play_sfx("level_clear")
 
                         if level_passed_timer > 0:
                             level_passed_timer -= 1
