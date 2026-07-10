@@ -51,6 +51,16 @@ class TutorialState:
                 "(Presiona ESPACIO o ENTER para continuar)"
             ],
             [
+                "¿Cómo calculamos los caminos críticos?",
+                "Usamos Programación Dinámica sobre el grafo (DAG):",
+                "primero ordenamos las materias con un Orden Topológico",
+                "(algoritmo de Kahn) y luego calculamos para cada materia",
+                "su cadena más larga de prerrequisitos.",
+                "El valor máximo define el 'Tiempo Récord' de la carrera.",
+                "",
+                "(Presiona ESPACIO o ENTER para continuar)"
+            ],
+            [
                 "Mecánicas de supervivencia:",
                 "Cada combate consume 1 punto de Energía.",
                 "Si te quedas sin energía, debes pulsar ESPACIO en el",
@@ -205,17 +215,17 @@ class TutorialState:
         if self.phase == TutorialPhase.TEXT_MAP:
             title = self.font_lg.render("TUTORIAL - MAPA", True, (100, 255, 100))
             surface.blit(title, title.get_rect(center=(self.width // 2, self.height // 4)))
-            if self.map_page_index == 3:
+            if self.map_page_index == 4:
                 body_lines = [line for line in self.map_pages[self.map_page_index] if not self._is_prompt_line(line)]
                 self._draw_text_lines(surface, body_lines, self.height // 2 - 92)
             else:
                 self._draw_text_lines(surface, self.map_pages[self.map_page_index], self.height // 2 - 50)
-            
+
             # Draw visual examples
-            if self.map_page_index == 2: # Energía
+            if self.map_page_index == 3: # Energía
                 energy_text = self.font_lg.render("Ejemplo:  Energia: 5/5", True, (255, 255, 100))
                 surface.blit(energy_text, energy_text.get_rect(center=(self.width // 2, self.height - 100)))
-            elif self.map_page_index == 3: # Vida (Corazones)
+            elif self.map_page_index == 4: # Vida (Corazones)
                 if self.heart_frames and len(self.heart_frames) > 0:
                     hx = self.width // 2
                     hy = self.height - 175

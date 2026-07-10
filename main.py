@@ -1513,7 +1513,8 @@ def main():
                 )
 
             if editor_mode:
-                editor.draw(screen, combat_cam_x, combat_cam_y)
+                editor.draw(screen, combat_cam_x, combat_cam_y,
+                            safe_rect=get_visible_virtual_rect(real_screen.get_size(), aspect_mode))
             elif debug_collisions and collision_manager:
                 collision_manager.draw_debug(
                     screen,
@@ -1542,13 +1543,15 @@ def main():
                         f"Jugador: {int(combat_player.x)}, {int(combat_player.y)}  Bloqueo: X={combat_player.last_collision.get('x')} Y={combat_player.last_collision.get('y')}",
                         "F1: debug colisiones | F2: Modo Editor | F3: etiquetas | F4: rutas IA",
                     ]
-                    info_y = 68
+                    # Anclado al área visible para que el modo 'fill' no lo recorte.
+                    debug_safe = get_visible_virtual_rect(real_screen.get_size(), aspect_mode)
+                    info_y = debug_safe.top + 68
                     for line in debug_lines:
                         text_surf = font_sm.render(line, True, (255, 255, 255))
                         bg = pygame.Surface((text_surf.get_width() + 10, text_surf.get_height() + 6), pygame.SRCALPHA)
                         bg.fill((0, 0, 0, 170))
-                        screen.blit(bg, (12, info_y))
-                        screen.blit(text_surf, (17, info_y + 3))
+                        screen.blit(bg, (debug_safe.left + 12, info_y))
+                        screen.blit(text_surf, (debug_safe.left + 17, info_y + 3))
                         info_y += text_surf.get_height() + 8
 
             # UI de Combate - Panel superior

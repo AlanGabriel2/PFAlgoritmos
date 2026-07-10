@@ -223,7 +223,11 @@ class CollisionEditor:
         self.manager.walkable_metadata = [m.copy() for m in self.level.walkable_metadata]
         # the manager doesn't manage hazards directly for physics, but just in case, we sync what we need.
 
-    def draw(self, screen, cam_x=0, cam_y=0):
+    def draw(self, screen, cam_x=0, cam_y=0, safe_rect=None):
+        # Área visible real: en modo 'fill' los bordes de la superficie virtual
+        # quedan fuera de pantalla, así que el HUD se ancla a safe_rect.
+        if safe_rect is None:
+            safe_rect = screen.get_rect()
         # Draw colliders (red)
         for i, r in enumerate(self.level.colliders):
             color = (255, 50, 50, 100)
@@ -262,7 +266,7 @@ class CollisionEditor:
                 
             info = f"Sel: {self.selected_list_type} {self.selected_index} | Pos: {int(rect.x)},{int(rect.y)} Size: {int(rect.w)}x{int(rect.h)}"
             t = self.font.render(info, True, (255, 255, 255))
-            screen.blit(t, (10, 100))
+            screen.blit(t, (safe_rect.left + 10, safe_rect.top + 100))
 
         # Draw creation rect
         if self.state == "CREATING":
@@ -280,8 +284,8 @@ class CollisionEditor:
                "Supr: Borrar",
                "Ctrl+S: Guardar en JSON",
                "F2: Salir"]
-        y_off = 130
+        y_off = safe_rect.top + 130
         for line in hud:
             t = self.font.render(line, True, (200, 200, 255))
-            screen.blit(t, (10, y_off))
+            screen.blit(t, (safe_rect.left + 10, y_off))
             y_off += 20
