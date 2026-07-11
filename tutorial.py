@@ -80,8 +80,8 @@ class TutorialState:
         ]
         
         self.combat_msg = [
-            "Mueve tu personaje EXCLUSIVAMENTE con W, A, S, D.",
-            "Apunta y dispara con el Ratón o con las Flechas Direccionales.",
+            "Muévete con W, A, S, D o con el stick izquierdo.",
+            "Apunta con Ratón/Flechas o dispara con el stick derecho.",
             "¡Cuidado, el enemigo contraataca! Intenta eliminarlo."
         ]
         
@@ -130,11 +130,12 @@ class TutorialState:
                 
         return None
 
-    def update(self, keys, width, height, mouse_x=None, mouse_y=None):
+    def update(self, keys, width, height, mouse_x=None, mouse_y=None, gamepad=None):
         self.timer += 1
         if self.phase == TutorialPhase.COMBAT_PRACTICE:
             # Player movement
-            self.player.move(keys, width, height, self.collision_manager)
+            move_vector = gamepad.get_move_vector() if gamepad and gamepad.connected else None
+            self.player.move(keys, width, height, self.collision_manager, move_vector)
             self.player.update_bullets(width, height)
             
             # Continuous mouse shooting with the same virtual-screen coordinates used in combat.
@@ -151,6 +152,14 @@ class TutorialState:
             if keys[pygame.K_RIGHT]: dx += 1
             if dx != 0 or dy != 0:
                 self.player.shoot_angle(math.atan2(dy, dx))
+
+            if gamepad and gamepad.connected:
+                aim_x, aim_y = gamepad.get_aim_vector()
+                if math.hypot(aim_x, aim_y) > 0.0:
+                    self.player.shoot_angle(math.atan2(aim_y, aim_x))
+                elif gamepad.wants_trigger_fire():
+                    last_x, last_y = gamepad.get_last_aim_vector()
+                    self.player.shoot_angle(math.atan2(last_y, last_x))
             
             if self.dummy_target:
                 self.dummy_target.update(self.player.x, self.player.y, width, height, self.collision_manager, None, [self.dummy_target])

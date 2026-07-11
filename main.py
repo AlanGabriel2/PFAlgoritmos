@@ -15,9 +15,10 @@ from level import DEFAULT_HAZARD_DAMAGE, DEFAULT_HAZARD_DAMAGE_COOLDOWN, load_co
 from collision_editor import CollisionEditor
 from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu
 from tutorial import TutorialState
+from gamepad import GamepadManager
 import audio
 
-# Buffer chico (512) para que los efectos suenen sin retraso perceptible.
+# Buffer estable para musica en streaming y efectos con baja latencia.
 pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.init()
 
@@ -629,6 +630,7 @@ def main():
     global_data = save_mgr.load_global_save()
     global screen, real_screen
     clock = pygame.time.Clock()
+    gamepad = GamepadManager()
 
     audio.init(global_data.get("volume", 100), global_data.get("music_volume", 100))
     audio.play_music("menu")
@@ -787,6 +789,8 @@ def main():
     debug_enemy_paths = False
     editor_mode = False
     editor = CollisionEditor(current_level, collision_manager)
+    gamepad_status_text = gamepad.consume_status_message() or ""
+    gamepad_status_timer = 240 if gamepad_status_text else 0
 
     combat_cam_x, combat_cam_y = 0, 0
 
@@ -949,6 +953,7 @@ def main():
         damage = strongest_hit["damage"]
         combat_player.hp -= damage
         audio.play_sfx("hurt")
+        gamepad.rumble()
         player_hazard_cooldown = positive_int(
             strongest_hit["data"].get("damage_cooldown"),
             DEFAULT_HAZARD_DAMAGE_COOLDOWN,
@@ -1076,7 +1081,16 @@ def main():
                     camera_y = (_mv.top + 104 + _mv.bottom)//2 - map_gen.rooms[selected_node].rect.centery
                     camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
 
-        for event in pygame.event.get():
+        frame_events = pygame.event.get()
+        for raw_event in frame_events:
+            gamepad.handle_event(raw_event)
+        frame_events.extend(gamepad.poll_events(game_state))
+        gamepad_message = gamepad.consume_status_message()
+        if gamepad_message:
+            gamepad_status_text = gamepad_message
+            gamepad_status_timer = 240
+
+        for event in frame_events:
             if event.type == pygame.QUIT:
                 running = False
 
@@ -1333,6 +1347,7 @@ def main():
                     trigger_transition("MAIN_MENU", "FADE", 0.05)
             elif game_state == "GAME_OVER":
                 if event.type == pygame.KEYDOWN and (event.key == pygame.K_r or event.key == pygame.K_SPACE):
+                    gamepad.quit()
                     main()
                     return
 
@@ -1344,7 +1359,7 @@ def main():
                 if disclaimer_screen.time > 200 and not trans_state["active"]:
                     trigger_transition("TITLE_SCREEN", "FADE", 0.03)
             elif game_state == "TUTORIAL":
-                tutorial_action = tutorial_state.update(keys, WIDTH, HEIGHT, mouse_x, mouse_y)
+                tutorial_action = tutorial_state.update(keys, WIDTH, HEIGHT, mouse_x, mouse_y, gamepad)
                 if tutorial_action == "FINISH_TUTORIAL":
                     finish_tutorial()
             elif game_state == "COMBAT":
@@ -1368,11 +1383,18 @@ def main():
                     if dx != 0 or dy != 0:
                         combat_player.shoot_angle(math.atan2(dy, dx))
 
+                    aim_x, aim_y = gamepad.get_aim_vector()
+                    if math.hypot(aim_x, aim_y) > 0.0:
+                        combat_player.shoot_angle(math.atan2(aim_y, aim_x))
+                    elif gamepad.wants_trigger_fire():
+                        last_aim_x, last_aim_y = gamepad.get_last_aim_vector()
+                        combat_player.shoot_angle(math.atan2(last_aim_y, last_aim_x))
+
                     # Mouse drag shooting
                     if pygame.mouse.get_pressed()[0]:
                         combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
 
-                    combat_player.move(keys, world_w, world_h, collision_manager)
+                    combat_player.move(keys, world_w, world_h, collision_manager, gamepad.get_move_vector())
                     combat_player.update_bullets(world_w, world_h)
                     apply_player_hazard_damage()
 
@@ -1391,6 +1413,7 @@ def main():
                             combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
                             enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
                             audio.play_sfx("hurt")
+                            gamepad.rumble()
 
                         # El jugador recibe daño por balas enemigas
                         for b in enemy.bullets[:]:
@@ -1398,6 +1421,7 @@ def main():
                             if dist < (combat_player.radius + b.radius):
                                 combat_player.hp -= 15
                                 audio.play_sfx("hurt")
+                                gamepad.rumble()
                                 if b in enemy.bullets:
                                     enemy.bullets.remove(b)
 
@@ -1405,6 +1429,7 @@ def main():
                             for hit in enemy.collect_area_damage_events(combat_player):
                                 combat_player.hp -= hit["damage"]
                                 audio.play_sfx("hurt")
+                                gamepad.rumble()
                                 floating_texts.append({
                                     "text": str(hit["damage"]),
                                     "x": hit["x"],
@@ -1498,6 +1523,8 @@ def main():
                 map_message_timer -= 1
             if save_indicator_timer > 0:
                 save_indicator_timer -= 1
+            if gamepad_status_timer > 0:
+                gamepad_status_timer -= 1
 
         # Dibujado
         screen.fill(BG_COLOR)
@@ -1803,6 +1830,17 @@ def main():
             s_text = font_sm.render("Guardando...", True, (255, 255, 255))
             screen.blit(s_text, (icon_x + 25, icon_y - s_text.get_height()//2))
 
+        if gamepad_status_timer > 0 and gamepad_status_text:
+            status_safe = get_visible_virtual_rect(real_screen.get_size(), aspect_mode)
+            status_alpha = min(255, max(0, int(gamepad_status_timer * 1.2)))
+            status_surf = font_sm.render(gamepad_status_text, True, (220, 245, 255))
+            status_surf.set_alpha(status_alpha)
+            status_bg = pygame.Surface((status_surf.get_width() + 20, status_surf.get_height() + 12), pygame.SRCALPHA)
+            status_bg.fill((0, 0, 0, min(180, max(0, int(gamepad_status_timer)))))
+            status_pos = (status_safe.left + 16, status_safe.bottom - status_bg.get_height() - 16)
+            screen.blit(status_bg, status_pos)
+            screen.blit(status_surf, (status_pos[0] + 10, status_pos[1] + 6))
+
         if trans_state["active"]:
             # Escalado por tiempo real para que la duración sea igual a cualquier FPS.
             trans_state["progress"] += trans_state["speed"] * render_scale
@@ -1819,6 +1857,8 @@ def main():
         present_virtual_surface(screen, real_screen, aspect_mode)
 
         pygame.display.flip()
+
+    gamepad.quit()
 
 if __name__ == "__main__":
     main()

@@ -333,6 +333,9 @@ class MainMenu:
                     if not self.jugar_expanded and self.selected_index >= len(self.current_options):
                         self.selected_index = self.current_options.index("Jugar")
                 return selection.strip()
+            elif event.key == pygame.K_ESCAPE and self.jugar_expanded:
+                self.jugar_expanded = False
+                self.selected_index = self.current_options.index("Jugar")
         return None
 
     def draw(self, surface, mouse_x, mouse_y):
@@ -1064,6 +1067,8 @@ class OptionsMenu:
                     return {"action": "BACK"}
                 else:
                     self.adjust_option(1)
+            elif event.key == pygame.K_ESCAPE:
+                return {"action": "BACK"}
         return None
 
     def adjust_option(self, direction):

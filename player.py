@@ -41,6 +41,8 @@ class Player:
         self.color = (0, 255, 255)
         self.bullets = []
         self.shoot_cooldown = 0
+        self._move_residual_x = 0.0
+        self._move_residual_y = 0.0
         
         from animator import Animator
         self.animator = Animator("assets/images/player/player_sheet.png", int(96 * scale), int(96 * scale), rows=3, cols=4, animation_speed=0.10)
@@ -54,39 +56,54 @@ class Player:
         self.x = float(self.rect.centerx)
         self.y = float(self.rect.centery)
 
-    def move(self, keys, width, height, collision_manager=None):
-        moved = False
+    def move(self, keys, width, height, collision_manager=None, input_vector=None):
         dx = 0
         dy = 0
 
         if keys[pygame.K_w]:
             dy -= 1
-            moved = True
         if keys[pygame.K_s]:
             dy += 1
-            moved = True
         if keys[pygame.K_a]:
             dx -= 1
-            moved = True
-            self.flip = True # Mirar a la izquierda
         if keys[pygame.K_d]:
             dx += 1
-            moved = True
-            self.flip = False # Mirar a la derecha
 
-        if dx != 0 and dy != 0:
-            diagonal_factor = 1 / math.sqrt(2)
-            dx *= diagonal_factor
-            dy *= diagonal_factor
+        if input_vector is not None:
+            dx += float(input_vector[0])
+            dy += float(input_vector[1])
 
-        dx *= self.speed
-        dy *= self.speed
+        self.move_vector(dx, dy, width, height, collision_manager)
+
+    def move_vector(self, dx, dy, width, height, collision_manager=None):
+        magnitude = math.hypot(dx, dy)
+        if magnitude > 1.0:
+            dx /= magnitude
+            dy /= magnitude
+            magnitude = 1.0
+
+        moved = magnitude > 0.01
+        if dx < -0.05:
+            self.flip = True
+        elif dx > 0.05:
+            self.flip = False
+
+        self._move_residual_x += dx * self.speed
+        self._move_residual_y += dy * self.speed
+        move_x = math.trunc(self._move_residual_x)
+        move_y = math.trunc(self._move_residual_y)
+        self._move_residual_x -= move_x
+        self._move_residual_y -= move_y
 
         if collision_manager:
-            self.last_collision = collision_manager.move_and_collide(self, dx, dy)
+            self.last_collision = collision_manager.move_and_collide(self, move_x, move_y)
+            if self.last_collision.get("x"):
+                self._move_residual_x = 0.0
+            if self.last_collision.get("y"):
+                self._move_residual_y = 0.0
         else:
-            self.x += dx
-            self.y += dy
+            self.x += move_x
+            self.y += move_y
             self.sync_rect_to_position()
             self.rect.clamp_ip(pygame.Rect(0, 0, width, height))
             self.sync_position_to_rect()

@@ -75,6 +75,13 @@ El mapa dibuja el grafo completo: nodos como salas y aristas como conexiones de 
 **Global**
 - Pantalla completa: `F11`
 
+**Con mando (Xbox / PlayStation / genérico)**
+- Mover / navegar: **stick izquierdo** o **D-pad**
+- Apuntar y disparar: **stick derecho**
+- Disparo alternativo: **RT / R2** en la última dirección apuntada
+- Confirmar: **A / Cross** · Volver: **B / Circle** · Pausa: **Start / Options**
+- Descansar en el mapa: **Y / Triangle**
+
 ---
 
 ## ⚙️ Requisitos e instalación
@@ -124,6 +131,7 @@ PFAlgoritmos/
 ├── data.py               # SUBJECTS: las 59 materias y sus prerrequisitos
 ├── map_generator.py      # MapGenerator/Room: layout del grafo por semestres, dibujo de nodos/aristas
 ├── player.py             # Player y proyectiles del jugador
+├── gamepad.py            # Mandos Xbox/PlayStation/genéricos, hot-plug y deadzones
 ├── enemy.py              # Jerarquía de enemigos (Bug, Spaghetti, MemoryLeak, Deadline, MiniBoss, Boss)
 ├── enemy_ai.py           # Comportamiento/persecución de enemigos
 ├── pathfinding.py        # Búsqueda de ruta (A*) para la navegación en combate
