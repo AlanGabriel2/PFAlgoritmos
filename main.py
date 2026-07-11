@@ -18,7 +18,7 @@ from tutorial import TutorialState
 import audio
 
 # Buffer chico (512) para que los efectos suenen sin retraso perceptible.
-pygame.mixer.pre_init(44100, -16, 2, 512)
+pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.init()
 
 # Configurar Pantalla
@@ -592,6 +592,38 @@ def draw_subject_tooltip(surface, engine, selected_node, sel_rect):
         cy += line_h
 
 
+def enemy_die_sfx_names(enemy):
+    """Efecto de muerte según el tipo de enemigo, con fallback al genérico."""
+    if isinstance(enemy, Boss):
+        return ("enemy_die_boss", "enemy_die_miniboss", "enemy_die")
+    if isinstance(enemy, MiniBoss):
+        return ("enemy_die_miniboss", "enemy_die")
+    if isinstance(enemy, BugEnemy):
+        return ("enemy_die_bug", "enemy_die")
+    if isinstance(enemy, SpaghettiEnemy):
+        return ("enemy_die_spaghetti", "enemy_die")
+    if isinstance(enemy, MemoryLeakEnemy):
+        return ("enemy_die_memoryleak", "enemy_die")
+    if isinstance(enemy, DeadlineEnemy):
+        return ("enemy_die_deadline", "enemy_die")
+    return ("enemy_die",)
+
+
+def combat_music_candidates_for_room(room_id):
+    """Selecciona la intensidad musical según el semestre real de la materia."""
+    semester_key = level_key_from_room_id(room_id)
+    try:
+        room_semester = int(semester_key[1:])
+    except (TypeError, ValueError):
+        room_semester = 1
+
+    if room_semester >= 7:
+        return ("combat_s3", "combat_s2", "combat", "map", "menu")
+    if room_semester >= 4:
+        return ("combat_s2", "combat", "map", "menu")
+    return ("combat", "map", "menu")
+
+
 def main():
     save_mgr = save_manager
     global_data = save_mgr.load_global_save()
@@ -781,6 +813,8 @@ def main():
         """
         if target in ("DISCLAIMER_SCREEN", "TITLE_SCREEN", "MAIN_MENU"):
             return ("menu",)
+        if target == "TUTORIAL":
+            return ("tutorial", "menu")
         if target == "MAP":
             return ("map", "menu")
         if target == "COMBAT":
@@ -788,13 +822,19 @@ def main():
                 return ("boss_final", "boss", "combat", "map", "menu")
             if is_miniboss_room(current_room):
                 return ("boss", "combat", "map", "menu")
-            return ("combat", "map", "menu")
+            return combat_music_candidates_for_room(current_room)
         if target == "WIN":
             return ("win", "menu")
         return None
 
     def trigger_transition(target, t_type="FADE", speed=0.04):
         nonlocal game_state
+        source_state = game_state
+        leaving_combat = source_state == "COMBAT" or (
+            source_state == "PAUSE" and previous_state == "COMBAT"
+        )
+        if leaving_combat and target in ("MAP", "MAIN_MENU", "WIN"):
+            audio.stop_all_sfx()
         trans_state["active"] = True
         trans_state["progress"] = 0.0
         trans_state["speed"] = speed
@@ -804,7 +844,10 @@ def main():
         candidates = music_candidates_for(target)
         if candidates:
             audio.play_music(*candidates)
-        audio.set_music_duck(target == "PAUSE")
+        keep_music_ducked = target == "PAUSE" or (
+            target == "OPTIONS" and options_return_state == "PAUSE"
+        )
+        audio.set_music_duck(keep_music_ducked)
 
     def ui_action(menu_obj, event, *args):
         """handle_event de un menú + click sonoro cuando el jugador acciona algo."""
@@ -1004,7 +1047,6 @@ def main():
         # Ritmo de RENDER segun el limite de FPS elegido (independiente de la resolucion).
         # "unlimited" -> tick(0): no limita. Devuelve los ms reales transcurridos.
         frame_ms = clock.tick(0 if fps_limit == "unlimited" else fps_limit)
-
         # Simulacion a PASO FIJO de 60 Hz desacoplada del render: acumulamos el tiempo
         # real y ejecutamos la logica en pasos de 1/60 s. Asi el juego corre a la misma
         # velocidad a 30, 60, 120, 144, 240 FPS o sin limite.
@@ -1392,7 +1434,7 @@ def main():
                                     combat_player.bullets.remove(b)
                                 if e.hp <= 0:
                                     enemies.remove(e)
-                                    audio.play_sfx("enemy_die")
+                                    audio.play_sfx(*enemy_die_sfx_names(e))
 
                     # Actualizar textos flotantes
                     for ft in floating_texts[:]:

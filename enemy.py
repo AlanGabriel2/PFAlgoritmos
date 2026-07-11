@@ -1,6 +1,7 @@
 import pygame
 import math
 import random
+import audio
 from animator import Animator
 from enemy_ai import EnemyNavigator, separation_delta
 
@@ -342,6 +343,7 @@ class MiniBoss(Enemy):
             self.navigator.force_repath = True
             self.navigator.mode = "landed"
             self.action_timer = 0
+            audio.play_sfx("miniboss_land", "hit")
         return True
 
     def after_navigation_update(self, player_x, player_y, width, height, pathfinder=None):
@@ -385,6 +387,7 @@ class MiniBoss(Enemy):
         self.navigator.clear_path()
         self.navigator.mode = "jumping"
         self.state = 2
+        audio.play_sfx("miniboss_jump", "pause")
         return True
 
     def choose_jump_target(self, player_x, player_y, width, height, pathfinder=None):
@@ -547,6 +550,7 @@ class MiniBoss(Enemy):
         self.navigator.clear_path()
         self.navigator.mode = "bombard_charge"
         self.state = 2
+        audio.play_sfx("missile_charge", "pause")
         return True
 
     def clamp_area_attack_target(self, target, width, height):
@@ -602,6 +606,7 @@ class MiniBoss(Enemy):
                         "damage": missile["damage"],
                     }
                 )
+                audio.play_sfx("missile_impact", "hit")
                 self.create_fire_zone(damage_center, missile["radius"])
 
         for explosion in self.area_explosions[:]:
@@ -654,6 +659,7 @@ class MiniBoss(Enemy):
             )
 
         self.navigator.mode = "bombard_launch"
+        audio.play_sfx("missile_launch", "shoot")
 
     def build_area_salvo_targets(self, center, width, height, round_index=0):
         dx = center[0] - self.x
@@ -683,6 +689,7 @@ class MiniBoss(Enemy):
                 "damage": self.area_fire_damage,
             }
         )
+        audio.play_sfx("fire_ignite", "enemy_die_bug", "hit")
 
     def collect_area_damage_events(self, player):
         hits = []
@@ -921,6 +928,7 @@ class MiniBoss(Enemy):
             # Shoot
             angle = math.atan2(player_y - self.y, player_x - self.x)
             self.bullets.append(EnemyBullet(self.x, self.y, angle, speed=6, radius=10, b_type="miniboss"))
+            audio.play_sfx("enemy_shoot", "shoot")
             self.action_timer = 0
             self.state = 0
 
@@ -960,6 +968,7 @@ class Boss(Enemy):
             for i in range(8):
                 angle = i * (math.pi / 4)
                 self.bullets.append(EnemyBullet(self.x, self.y, angle, speed=4, radius=12, b_type="boss"))
+            audio.play_sfx("enemy_shoot", "shoot")
             self.action_timer = 0
             self.state = 0
 

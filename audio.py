@@ -20,9 +20,24 @@ MUSIC_DIR = os.path.join("assets", "audio", "music")
 SFX_DIR = os.path.join("assets", "audio", "sfx")
 AUDIO_EXTS = (".ogg", ".wav", ".mp3")
 
-MUSIC_FADE_MS = 600
+MUSIC_FADE_OUT_MS = 80
+MUSIC_FADE_IN_MS = 100
 SFX_MIN_INTERVAL_MS = 45   # evita que un mismo efecto se apile y sature en un frame
 DUCK_FACTOR = 0.35         # atenuación de la música durante la pausa
+
+# Ganancia relativa por efecto (1.0 = volumen general). Para nivelar a oído
+# efectos de packs distintos sin editar los archivos.
+SFX_GAIN = {
+    "hit": 0.8,        # suena en cada bala conectada: mejor discreto
+    "shoot": 0.55,     # dispara cada 0.25 s: es el efecto más frecuente del juego
+    "enemy_shoot": 0.45,
+    "miniboss_jump": 0.75,
+    "miniboss_land": 0.85,
+    "missile_charge": 0.65,
+    "missile_launch": 0.70,
+    "missile_impact": 0.90,
+    "fire_ignite": 0.65,
+}
 
 _enabled = False
 _sfx = {}                  # nombre -> pygame.mixer.Sound
@@ -90,8 +105,8 @@ def set_volumes(general_pct, music_pct):
     _music = _clamp_pct(music_pct)
     if not _enabled:
         return
-    for sound in _sfx.values():
-        sound.set_volume(_general)
+    for name, sound in _sfx.items():
+        sound.set_volume(_general * SFX_GAIN.get(name, 1.0))
     _apply_music_volume()
 
 
@@ -100,6 +115,18 @@ def set_music_duck(active):
     global _duck
     _duck = DUCK_FACTOR if active else 1.0
     _apply_music_volume()
+
+
+def _start_music(name, path, loop):
+    global _current_track
+    try:
+        pygame.mixer.music.load(path)
+        _apply_music_volume()
+        pygame.mixer.music.play(-1 if loop else 0, fade_ms=MUSIC_FADE_IN_MS)
+        _current_track = name
+    except pygame.error as e:
+        print(f"No se pudo reproducir la música '{path}': {e}")
+        _current_track = None
 
 
 def play_music(*candidates, loop=True):
@@ -121,42 +148,50 @@ def play_music(*candidates, loop=True):
 
     if chosen_name is None:
         if _current_track is not None:
-            pygame.mixer.music.fadeout(MUSIC_FADE_MS)
+            pygame.mixer.music.fadeout(MUSIC_FADE_OUT_MS)
             _current_track = None
         _report_missing("música: " + "/".join(candidates))
         return
 
     if chosen_name == _current_track and pygame.mixer.music.get_busy():
         return
-    try:
-        pygame.mixer.music.load(chosen_path)
-        _apply_music_volume()
-        pygame.mixer.music.play(-1 if loop else 0, fade_ms=MUSIC_FADE_MS)
-        _current_track = chosen_name
-    except pygame.error as e:
-        print(f"No se pudo reproducir la música '{chosen_path}': {e}")
-        _current_track = None
+    _start_music(chosen_name, chosen_path, loop)
 
 
-def stop_music(fade_ms=MUSIC_FADE_MS):
+def stop_music(fade_ms=MUSIC_FADE_OUT_MS):
     global _current_track
     if _enabled:
         pygame.mixer.music.fadeout(fade_ms)
     _current_track = None
 
 
-def play_sfx(name):
-    """Reproduce un efecto del banco; silencioso si no existe el archivo."""
-    if not _enabled:
+def stop_all_sfx(fade_ms=180):
+    """Desvanece efectos activos sin detener la música en streaming."""
+    if _enabled:
+        pygame.mixer.fadeout(max(0, int(fade_ms)))
+
+
+def play_sfx(*names):
+    """Reproduce el primer efecto disponible de la lista; silencioso si no hay ninguno.
+
+    Acepta fallbacks igual que play_music: play_sfx("enemy_die_bug", "enemy_die")
+    usa el efecto específico si existe y si no, el genérico.
+    """
+    if not _enabled or not names:
         return
-    sound = _sfx.get(name)
+    chosen, sound = None, None
+    for name in names:
+        sound = _sfx.get(name)
+        if sound is not None:
+            chosen = name
+            break
     if sound is None:
-        _report_missing("efecto: " + name)
+        _report_missing("efecto: " + "/".join(names))
         return
     now = pygame.time.get_ticks()
-    if now - _last_sfx_ms.get(name, -SFX_MIN_INTERVAL_MS) < SFX_MIN_INTERVAL_MS:
+    if now - _last_sfx_ms.get(chosen, -SFX_MIN_INTERVAL_MS) < SFX_MIN_INTERVAL_MS:
         return
-    _last_sfx_ms[name] = now
+    _last_sfx_ms[chosen] = now
     sound.play()
 
 
