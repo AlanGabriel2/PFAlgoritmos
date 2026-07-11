@@ -965,18 +965,7 @@
             "enabled": true
         }
     ],
-    "hazard_zones": [
-        {
-            "x": 790,
-            "y": 415,
-            "w": 95,
-            "h": 95,
-            "name": "central_cosmic_core",
-            "type": "core_hazard",
-            "enabled": true,
-            "damage": 0
-        }
-    ],
+    "hazard_zones": [],
     "triggers": [],
     "interactables": [],
     "doors": [],
@@ -1090,8 +1079,8 @@
             "enabled": true
         },
         {
-            "x": 659,
-            "y": 332,
+            "x": 650,
+            "y": 322,
             "w": 374,
             "h": 298,
             "name": "new_101",
@@ -1198,8 +1187,8 @@
             "enabled": true
         },
         {
-            "x": 1154,
-            "y": 413,
+            "x": 1151,
+            "y": 410,
             "w": 154,
             "h": 131,
             "name": "new_27",
