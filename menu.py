@@ -767,7 +767,17 @@ class BestiaryMenu:
         self.instances = []
         for data in self.enemies_data:
             enemy_instance = data["class"](0, 0)
-            enemy_instance.animator.animation_speed = 0.05 # Slower animation for Bestiary
+            # El bestiario es una vitrina: siempre muestra IDLE. Cambiar solo
+            # animation_speed no funcionaba porque cada estado tiene su propia
+            # velocidad y la sobreescribia.
+            controller = getattr(enemy_instance, "controller", None)
+            if controller is not None:
+                controller.set_base("idle")
+            preview_speed = 0.035 if isinstance(enemy_instance, MiniBoss) else 0.045
+            enemy_instance.animator.animation_speed = preview_speed
+            enemy_instance.animator.state_speeds = {
+                state: preview_speed for state in enemy_instance.animator.frames
+            }
             self.instances.append(enemy_instance)
 
         self.current_index = 0

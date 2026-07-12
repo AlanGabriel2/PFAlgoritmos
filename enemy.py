@@ -70,6 +70,8 @@ class Enemy:
         self.evasion_dir = random.choice([-1, 1])
         self.evasion_timer = 0
         self.hit_flash = 0  # frames de flash blanco al recibir un balazo
+        self.knockback_x = 0.0
+        self.knockback_y = 0.0
         self.ai_smartness = 0.85
         self.separation_weight = 0.55
         self.navigator = EnemyNavigator()
@@ -100,11 +102,12 @@ class Enemy:
         pass
 
     def update(self, player_x, player_y, width, height, collision_manager=None, pathfinder=None, nearby_enemies=None):
+        old_x, old_y = self.x, self.y
         if self.update_special_movement(player_x, player_y, width, height, collision_manager, pathfinder):
             self._update_cooldowns_and_bullets(width, height)
+            self._sync_animation_base(old_x, old_y)
             return
 
-        old_x, old_y = self.x, self.y
         self.move_logic(player_x, player_y)
 
         dx = self.x - old_x
@@ -135,6 +138,14 @@ class Enemy:
         sep_x, sep_y = separation_delta(self, nearby_enemies)
         dx += sep_x
         dy += sep_y
+        dx += self.knockback_x
+        dy += self.knockback_y
+        self.knockback_x *= 0.55
+        self.knockback_y *= 0.55
+        if abs(self.knockback_x) < 0.05:
+            self.knockback_x = 0.0
+        if abs(self.knockback_y) < 0.05:
+            self.knockback_y = 0.0
 
         if ignores_map:
             self.x, self.y = old_x + dx, old_y + dy
@@ -156,6 +167,33 @@ class Enemy:
 
         self.after_navigation_update(player_x, player_y, width, height, pathfinder)
         self._update_cooldowns_and_bullets(width, height)
+        self._sync_animation_base(old_x, old_y)
+
+    def configure_standard_controller(self, base="move"):
+        self.controller = AnimationController(self.animator, {
+            "idle": AnimationClip(state=0, loop=True, priority=0),
+            "move": AnimationClip(state=1, loop=True, priority=0),
+            "attack": AnimationClip(state=2, loop=False, priority=30),
+        }, base=base)
+
+    def _sync_animation_base(self, old_x, old_y):
+        controller = getattr(self, "controller", None)
+        if controller is None:
+            return
+        moved = math.hypot(self.x - old_x, self.y - old_y) > 0.3
+        controller.set_base("move" if moved else "idle")
+
+    def take_damage(self, amount, source_x=None, source_y=None):
+        self.hp -= amount
+        self.hit_flash = 4
+        if source_x is not None and source_y is not None:
+            dx = self.x - source_x
+            dy = self.y - source_y
+            distance = max(1.0, math.hypot(dx, dy))
+            strength = 1.5 if isinstance(self, (MiniBoss, Boss)) else 4.0
+            self.knockback_x = dx / distance * strength
+            self.knockback_y = dy / distance * strength
+        return self.hp <= 0
 
     def _update_cooldowns_and_bullets(self, width, height):
         if self.attack_cooldown > 0:
@@ -247,19 +285,7 @@ class BugEnemy(Enemy):
                 state, f"assets/images/enemies/generated/bug_{name}_v2_alpha_master_normalized.png",
                 rows=2, cols=4, frame_height=int(54 * scale),
             )
-        self.controller = AnimationController(self.animator, {
-            "idle": AnimationClip(state=0, loop=True, priority=0),
-            "move": AnimationClip(state=1, loop=True, priority=0),
-            "attack": AnimationClip(state=2, loop=False, priority=30),
-        }, base="move")
-
-    def update(self, player_x, player_y, width, height, collision_manager=None, pathfinder=None, nearby_enemies=None):
-        old_x, old_y = self.x, self.y
-        super().update(player_x, player_y, width, height, collision_manager, pathfinder, nearby_enemies)
-        # Base segun desplazamiento real: si quedo bloqueado o acorralado se ve
-        # en reposo en vez de "patinar" con la animacion de caminar.
-        moved = math.hypot(self.x - old_x, self.y - old_y) > 0.3
-        self.controller.set_base("move" if moved else "idle")
+        self.configure_standard_controller()
 class SpaghettiEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
         super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet_normalized.png", 72, scale=scale, collision_scale=0.70)
@@ -271,6 +297,7 @@ class SpaghettiEnemy(Enemy):
                 state, f"assets/images/enemies/generated/spaghetti_{name}_v2_alpha_master_normalized.png",
                 rows=2, cols=4, frame_height=int(72 * scale),
             )
+        self.configure_standard_controller()
     def move_logic(self, player_x, player_y):
         # Erratic movement
         angle = math.atan2(player_y - self.y, player_x - self.x) + random.uniform(-0.5, 0.5)
@@ -288,6 +315,7 @@ class MemoryLeakEnemy(Enemy):
                 state, f"assets/images/enemies/generated/leak_{name}_v2_alpha_master_normalized.png",
                 rows=2, cols=4, frame_height=int(48 * scale),
             )
+        self.configure_standard_controller()
 
 class DeadlineEnemy(Enemy):
     SCALE_FACTOR = 0.9  # ajuste visual sobre la escala del nivel
@@ -318,6 +346,7 @@ class DeadlineEnemy(Enemy):
             cols=4,
             frame_height=int(96 * scale),
         )
+        self.configure_standard_controller()
     def move_logic(self, player_x, player_y):
         dist = math.hypot(player_x - self.x, player_y - self.y)
         speed = 4.0 if dist < 150 else 1.0
@@ -325,6 +354,8 @@ class DeadlineEnemy(Enemy):
         self.x += math.cos(angle) * speed
         self.y += math.sin(angle) * speed
         self.state = 1 if speed == 1.0 else 2
+        if speed > 1.0:
+            self.controller.play("attack")
 
     def draw(self, surface, offset_x=0, offset_y=0):
         # Efecto visual de enfado / aceleración (aura roja pulsante)
@@ -415,6 +446,7 @@ class MiniBoss(Enemy):
         self.area_fires = []
         self.area_damage_events = []
         self.color = (255, 90, 40)
+        self.configure_standard_controller()
 
     def update_special_movement(self, player_x, player_y, width, height, collision_manager=None, pathfinder=None):
         self.update_area_attacks(width, height, player_x, player_y)
@@ -427,6 +459,7 @@ class MiniBoss(Enemy):
             self.navigator.clear_path()
             self.navigator.mode = "bombard_charge" if self.area_attack_charge_timer > 0 else "bombard_reload"
             self.state = 2
+            self.controller.play("attack")
             return True
 
         if self.jump_timer <= 0:
@@ -442,6 +475,7 @@ class MiniBoss(Enemy):
         self.navigator.clear_path()
         self.navigator.mode = "jumping"
         self.state = 2
+        self.controller.play("attack")
 
         self.jump_timer -= 1
         if self.jump_timer <= 0:
@@ -500,6 +534,7 @@ class MiniBoss(Enemy):
         self.navigator.clear_path()
         self.navigator.mode = "jumping"
         self.state = 2
+        self.controller.play("attack")
         audio.play_sfx("miniboss_jump", "pause")
         return True
 
@@ -1037,6 +1072,7 @@ class MiniBoss(Enemy):
         elif self.action_timer < 150:
             # Telegraph attack
             self.state = 2
+            self.controller.play("attack")
         else:
             # Shoot
             angle = math.atan2(player_y - self.y, player_x - self.x)
@@ -1060,6 +1096,7 @@ class Boss(Enemy):
                 state, f"assets/images/enemies/generated/boss_{name}_v2_alpha_master_normalized.png",
                 rows=2, cols=4, frame_height=int(288 * scale),
             )
+        self.configure_standard_controller()
         self.action_timer = 0
         
 
@@ -1085,6 +1122,7 @@ class Boss(Enemy):
         elif self.action_timer < 190:
             # Telegraph
             self.state = 2
+            self.controller.play("attack")
         else:
             # Shoot ring of 8 bullets (Null Pointers)
             for i in range(8):

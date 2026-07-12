@@ -3,6 +3,7 @@ PROJECT_CONTEXT.md
 
 # Archivos generados/locales
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.bak
 saves/*.json

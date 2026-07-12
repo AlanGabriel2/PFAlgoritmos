@@ -209,6 +209,31 @@ def draw_floor(surface, background, offset_x=0, offset_y=0):
         pygame.draw.rect(surface, (40, 30, 30), (0, 0, WIDTH, HEIGHT))
 
 
+def draw_boss_health_bar(surface, boss, safe_rect, font):
+    """Barra pixel-art legible para minibosses y el jefe final."""
+    if boss is None or boss.max_hp <= 0:
+        return
+    ratio = max(0.0, min(1.0, boss.hp / boss.max_hp))
+    bar_w = min(520, safe_rect.width - 80)
+    bar_h = 22
+    bar_x = safe_rect.centerx - bar_w // 2
+    # El HUD del jugador ocupa los primeros 60 px. La barra del jefe vive
+    # debajo de esa franja para que los corazones nunca la oculten.
+    bar_y = safe_rect.top + 78
+    outer = pygame.Rect(bar_x - 4, bar_y - 4, bar_w + 8, bar_h + 8)
+    pygame.draw.rect(surface, (12, 9, 16), outer)
+    pygame.draw.rect(surface, (220, 180, 125), outer, 2)
+    pygame.draw.rect(surface, (50, 18, 25), (bar_x, bar_y, bar_w, bar_h))
+    fill_w = int(bar_w * ratio)
+    if fill_w > 0:
+        color = (205, 42, 54) if ratio > 0.25 else (245, 92, 48)
+        pygame.draw.rect(surface, color, (bar_x, bar_y, fill_w, bar_h))
+        pygame.draw.rect(surface, (255, 130, 92), (bar_x, bar_y, fill_w, 4))
+    label = "MEGA BOSS" if isinstance(boss, Boss) else "MINI BOSS"
+    text = font.render(f"{label}  {max(0, int(boss.hp))}/{boss.max_hp}", False, (255, 240, 220))
+    surface.blit(text, text.get_rect(center=(safe_rect.centerx, bar_y + bar_h // 2)))
+
+
 
 def render_text_fit(font, text, color, max_width, antialias=False):
     text_surface = font.render(text, antialias, color)
@@ -772,6 +797,10 @@ def main():
     gamepad_status_timer = 240 if gamepad_status_text else 0
 
     combat_cam_x, combat_cam_y = 0, 0
+    hit_stop_frames = 0
+    screen_shake_timer = 0
+    screen_shake_duration = 0
+    screen_shake_magnitude = 0.0
 
     current_wave = 1
     max_waves = 1
@@ -782,6 +811,14 @@ def main():
     death_effects = []  # esquirlas de píxeles de enemigos muriendo
     combat_stats = {"damage": 0, "kills": 0, "start_ms": 0, "end_ms": 0}  # resumen post-combate
     map_unlock_effects = []  # anillos de "materia desbloqueada" en el mapa
+
+    def trigger_combat_feedback(stop_frames=0, shake_magnitude=0.0, shake_frames=0):
+        nonlocal hit_stop_frames, screen_shake_timer, screen_shake_duration, screen_shake_magnitude
+        hit_stop_frames = max(hit_stop_frames, int(stop_frames))
+        if shake_frames > 0 and shake_magnitude > 0:
+            screen_shake_timer = max(screen_shake_timer, int(shake_frames))
+            screen_shake_duration = max(screen_shake_duration, int(shake_frames))
+            screen_shake_magnitude = max(screen_shake_magnitude, float(shake_magnitude))
 
     def capture_unlocks(states_before):
         """Registra las materias recién desbloqueadas para celebrarlas en el mapa."""
@@ -1029,7 +1066,7 @@ def main():
         return enemy_cls(last_position[0], last_position[1], scale=scale)
 
     def start_combat(room_id):
-        nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy, level_passed_timer, level_passed_done, level_failed_timer, level_failed_done, player_hazard_cooldown
+        nonlocal current_room, combat_player, enemies, current_wave, max_waves, wave_timer, energy, level_passed_timer, level_passed_done, level_failed_timer, level_failed_done, player_hazard_cooldown, hit_stop_frames, screen_shake_timer, screen_shake_duration, screen_shake_magnitude
         current_room = room_id
         load_room_level(current_room)
         trigger_transition("COMBAT", "CIRCLE", 0.03)
@@ -1039,6 +1076,10 @@ def main():
         level_failed_timer = 0
         level_failed_done = False
         player_hazard_cooldown = 0
+        hit_stop_frames = 0
+        screen_shake_timer = 0
+        screen_shake_duration = 0
+        screen_shake_magnitude = 0.0
         death_effects.clear()
         combat_stats["damage"] = 0
         combat_stats["kills"] = 0
@@ -1399,6 +1440,11 @@ def main():
         # Simulacion a PASO FIJO (60 Hz): se ejecuta 0, 1 o varias veces por frame de
         # render segun sim_steps, manteniendo la velocidad del juego constante a cualquier FPS.
         for _ in range(sim_steps):
+            if screen_shake_timer > 0:
+                screen_shake_timer -= 1
+                if screen_shake_timer <= 0:
+                    screen_shake_magnitude = 0.0
+                    screen_shake_duration = 0
             # Actualizaciones Continuas (teclas presionadas)
             if game_state == "DISCLAIMER_SCREEN":
                 if disclaimer_screen.time > 200 and not trans_state["active"]:
@@ -1417,6 +1463,10 @@ def main():
                     if level_failed_timer == 0:
                         level_failed_done = True
                         trigger_transition("MAP", "CIRCLE", 0.04)
+                elif hit_stop_frames > 0:
+                    # Pausa solo la simulacion de combate: render, eventos y
+                    # presentacion siguen vivos; nunca se bloquea con sleep().
+                    hit_stop_frames -= 1
                 elif not editor_mode:
                     # Disparar con flechas (soporta diagonales)
                     dx, dy = 0, 0
@@ -1459,6 +1509,11 @@ def main():
                             if combat_player.take_damage(contact_damage):
                                 enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
                                 enemy.notify_attack()
+                                trigger_combat_feedback(
+                                    4,
+                                    5.0 if isinstance(enemy, (MiniBoss, Boss)) else 3.0,
+                                    12,
+                                )
                                 combat_stats["damage"] += contact_damage
                                 audio.play_sfx("hurt")
                                 if isinstance(enemy, (MiniBoss, Boss)):
@@ -1474,6 +1529,7 @@ def main():
                                     combat_stats["damage"] += 15
                                     audio.play_sfx("hurt")
                                     gamepad.rumble()
+                                    trigger_combat_feedback(3, 3.0, 10)
                                 if b in enemy.bullets:
                                     enemy.bullets.remove(b)
 
@@ -1482,6 +1538,7 @@ def main():
                                 if not combat_player.take_damage(hit["damage"]):
                                     continue
                                 combat_stats["damage"] += hit["damage"]
+                                trigger_combat_feedback(4, 4.0, 12)
                                 audio.play_sfx("hurt")
                                 gamepad.rumble()
                                 floating_texts.append({
@@ -1497,9 +1554,12 @@ def main():
                         for e in enemies[:]:
                             if e.collides_with_bullet(b):
                                 damage = 10
-                                e.hp -= damage
-                                e.hit_flash = 4
+                                defeated = e.take_damage(damage, b.x, b.y)
                                 audio.play_sfx("hit")
+                                # Los disparos son frecuentes: un temblor muy fuerte
+                                # en cada impacto vuelve la punteria brusca. Conserva
+                                # el hit-stop, pero usa solo una vibracion sutil.
+                                trigger_combat_feedback(2, 0.55, 4)
 
                                 # Generar texto flotante de daño
                                 floating_texts.append({
@@ -1512,7 +1572,12 @@ def main():
 
                                 if b in combat_player.bullets:
                                     combat_player.bullets.remove(b)
-                                if e.hp <= 0:
+                                if defeated:
+                                    trigger_combat_feedback(
+                                        5,
+                                        2.25 if isinstance(e, (MiniBoss, Boss)) else 1.2,
+                                        9,
+                                    )
                                     enemies.remove(e)
                                     combat_stats["kills"] += 1
                                     spawn_death_effect(e)
@@ -1712,13 +1777,32 @@ def main():
                 screen.blit(msg_surf, msg_rect)
 
         elif game_state == "COMBAT" or (game_state == "PAUSE" and previous_state == "COMBAT"):
-            draw_floor(screen, combat_bg_img, combat_cam_x, combat_cam_y)
+            shake_x = shake_y = 0
+            if screen_shake_timer > 0 and screen_shake_duration > 0:
+                decay = screen_shake_timer / screen_shake_duration
+                magnitude = screen_shake_magnitude * decay
+                shake_x = int(round(math.sin(screen_shake_timer * 2.37) * magnitude))
+                shake_y = int(round(math.cos(screen_shake_timer * 3.11) * magnitude))
+            render_combat_cam_x = combat_cam_x + shake_x
+            render_combat_cam_y = combat_cam_y + shake_y
+
+            draw_floor(screen, combat_bg_img, render_combat_cam_x, render_combat_cam_y)
             for e in enemies:
                 if hasattr(e, "draw_area_ground_effects"):
-                    e.draw_area_ground_effects(screen, combat_cam_x, combat_cam_y)
-            combat_player.draw(screen, combat_cam_x, combat_cam_y)
+                    e.draw_area_ground_effects(screen, render_combat_cam_x, render_combat_cam_y)
+            combat_player.draw(screen, render_combat_cam_x, render_combat_cam_y)
             for e in enemies:
-                e.draw(screen, combat_cam_x, combat_cam_y)
+                e.draw(screen, render_combat_cam_x, render_combat_cam_y)
+
+            active_boss = next((e for e in enemies if isinstance(e, Boss)), None)
+            if active_boss is None:
+                active_boss = next((e for e in enemies if isinstance(e, MiniBoss)), None)
+            draw_boss_health_bar(
+                screen,
+                active_boss,
+                get_visible_virtual_rect(real_screen.get_size(), aspect_mode),
+                font_sm,
+            )
 
             # Esquirlas de muerte: bloques del sprite que se encogen al volar
             for fx in death_effects:
@@ -1726,14 +1810,14 @@ def main():
                 pw = max(1, int(fx["piece"].get_width() * f))
                 ph = max(1, int(fx["piece"].get_height() * f))
                 piece = pygame.transform.scale(fx["piece"], (pw, ph))
-                screen.blit(piece, (int(fx["x"] + combat_cam_x - pw / 2), int(fx["y"] + combat_cam_y - ph / 2)))
+                screen.blit(piece, (int(fx["x"] + render_combat_cam_x - pw / 2), int(fx["y"] + render_combat_cam_y - ph / 2)))
 
             # Dibujar textos flotantes de daño
             for ft in floating_texts:
                 alpha = min(255, int((ft["life"] / 40.0) * 255))
                 dmg_surf = font_md.render(ft["text"], True, ft["color"])
                 dmg_surf.set_alpha(alpha)
-                rect = dmg_surf.get_rect(center=(int(ft["x"] + combat_cam_x), int(ft["y"] + combat_cam_y)))
+                rect = dmg_surf.get_rect(center=(int(ft["x"] + render_combat_cam_x), int(ft["y"] + render_combat_cam_y)))
                 screen.blit(dmg_surf, rect)
 
             # Resumen post-combate mientras corre la pausa de sala superada
@@ -1770,33 +1854,33 @@ def main():
                     screen,
                     enemies,
                     pathfinder,
-                    camera=(combat_cam_x, combat_cam_y),
+                    camera=(render_combat_cam_x, render_combat_cam_y),
                     font=font_sm,
                     player_pos=(combat_player.x, combat_player.y),
                 )
 
             if editor_mode:
-                editor.draw(screen, combat_cam_x, combat_cam_y,
+                editor.draw(screen, render_combat_cam_x, render_combat_cam_y,
                             safe_rect=get_visible_virtual_rect(real_screen.get_size(), aspect_mode))
             elif debug_collisions and collision_manager:
                 collision_manager.draw_debug(
                     screen,
-                    camera=(combat_cam_x, combat_cam_y),
+                    camera=(render_combat_cam_x, render_combat_cam_y),
                     font=font_sm,
                     show_names=debug_collision_labels,
                 )
                 current_level.draw_hazard_debug(
                     screen,
-                    camera=(combat_cam_x, combat_cam_y),
+                    camera=(render_combat_cam_x, render_combat_cam_y),
                     font=font_sm,
                     show_names=debug_collision_labels,
                 )
 
-                p_rect = combat_player.rect.move(combat_cam_x, combat_cam_y)
+                p_rect = combat_player.rect.move(render_combat_cam_x, render_combat_cam_y)
                 p_hit = combat_player.last_collision.get("x") or combat_player.last_collision.get("y")
                 pygame.draw.rect(screen, (255, 80, 80) if p_hit else (0, 255, 255), p_rect, 2)
                 for e in enemies:
-                    e_rect = e.rect.move(combat_cam_x, combat_cam_y)
+                    e_rect = e.rect.move(render_combat_cam_x, render_combat_cam_y)
                     e_hit = e.last_collision.get("x") or e.last_collision.get("y")
                     pygame.draw.rect(screen, (255, 80, 80) if e_hit else (255, 80, 180), e_rect, 1)
 

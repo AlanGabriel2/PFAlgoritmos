@@ -70,7 +70,7 @@ def test_draw_avanza_por_el_controller(bug):
     assert bug.animator.current_row == 2  # fila del clip attack
 
 
-def test_notify_attack_es_noop_en_no_migrados():
+def test_notify_attack_dispara_one_shot_en_enemigos_migrados():
     spaghetti = SpaghettiEnemy(100, 100, scale=1.0)
-    spaghetti.notify_attack()  # no debe fallar ni cambiar nada
-    assert not hasattr(spaghetti, "controller") or spaghetti.controller is None
+    spaghetti.notify_attack()
+    assert spaghetti.controller.current == "attack"
