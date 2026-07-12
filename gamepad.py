@@ -17,7 +17,7 @@ NAV_INITIAL_DELAY_MS = 320
 NAV_REPEAT_MS = 115
 TRIGGER_THRESHOLD = 0.38
 
-NAV_CONTEXTS = {"MAIN_MENU", "SLOT_SELECT", "PAUSE", "BESTIARY", "OPTIONS", "MAP"}
+NAV_CONTEXTS = {"MAIN_MENU", "SLOT_SELECT", "PAUSE", "BESTIARY", "OPTIONS", "MAP", "WIN"}
 BACK_CONTEXTS = {"MAIN_MENU", "SLOT_SELECT", "PAUSE", "BESTIARY", "OPTIONS"}
 
 # Zonas muertas seleccionables desde Opciones (la de apuntado va un poco más alta
@@ -39,12 +39,12 @@ PROMPT_LABELS = {
     "xbox": {
         "confirm": "A", "back": "B", "alt": "X", "rest": "Y",
         "pause": "START", "navigate": "D-PAD",
-        "move": "STICK IZQ", "aim": "STICK DER",
+        "move": "STICK IZQ", "aim": "STICK DER", "tabs": "LB/RB",
     },
     "playstation": {
         "confirm": "X", "back": "O", "alt": "CUADRADO", "rest": "TRIANGULO",
         "pause": "OPTIONS", "navigate": "D-PAD",
-        "move": "STICK IZQ", "aim": "STICK DER",
+        "move": "STICK IZQ", "aim": "STICK DER", "tabs": "L1/R1",
     },
 }
 PROMPT_LABELS["controller"] = PROMPT_LABELS["xbox"]
@@ -54,6 +54,9 @@ PROMPT_LABELS["generic"] = PROMPT_LABELS["xbox"]
 # El orden importa: primero las frases largas para no romperlas con las cortas.
 # Solo tokens en MAYÚSCULAS o entre comillas: no tocan palabras normales.
 _LOCALIZE_RULES = (
+    ("F_APLICAR", "alt"),
+    ("QE_TABS", "tabs"),
+    ("ESC_PAUSA", "pause"),
     ("ESPACIO o ENTER", "confirm"),
     ("las FLECHAS", "el D-PAD"),
     ("FLECHAS", "navigate"),
@@ -105,6 +108,9 @@ ICON_SIDE_PAD = 3  # aire horizontal alrededor de cada icono, en píxeles
 # (token en el texto original) -> acción. Mismo espíritu que _LOCALIZE_RULES,
 # más los tokens exclusivos de mando (RT/R2). El orden importa.
 _RENDER_RULES = (
+    ("F_APLICAR", "alt"),
+    ("QE_TABS", "tabs"),
+    ("ESC_PAUSA", "pause"),
     ("ESPACIO o ENTER", "confirm"),
     ("Flechas/Mouse", "aim"),
     ("las FLECHAS", "navigate"),
@@ -121,10 +127,11 @@ _RENDER_PATTERN = re.compile("|".join(re.escape(token) for token, _ in _RENDER_R
 
 # En modo teclado solo estas acciones tienen icono de tecla; el resto (move,
 # aim, trigger) se queda como texto original ("WASD", "Flechas/Mouse"...).
-_KEYBOARD_ICON_ACTIONS = {"confirm", "back", "rest", "navigate", "key_r"}
+_KEYBOARD_ICON_ACTIONS = {"confirm", "back", "rest", "navigate", "key_r", "key_f", "tabs"}
 # Con teclado, algunos tokens usan su propia tecla en vez de la acción genérica
 # (p. ej. 'R' de reintentar debe mostrar la tecla R, no ENTER).
-_KEYBOARD_TOKEN_OVERRIDES = {"'R'": "key_r"}
+_KEYBOARD_TOKEN_OVERRIDES = {"'R'": "key_r", "ESC_PAUSA": "back",
+                             "F_APLICAR": "key_f", "QE_TABS": "tabs"}
 
 _icon_base = {}    # (modo, accion) -> Surface base o None si no existe el PNG
 _icon_scaled = {}  # (modo, accion, alto) -> Surface escalada
@@ -139,12 +146,38 @@ def _icon_mode():
 def _load_icon(mode, action):
     key = (mode, action)
     if key not in _icon_base:
-        path = os.path.join(PROMPT_ICON_DIR, f"{mode}_{action}.png")
+        if mode == "keyboard" and action == "key_f":
+            path = os.path.join("kenney_input-prompts-pixel", "Tiles", "tile_0395.png")
+        else:
+            path = os.path.join(PROMPT_ICON_DIR, f"{mode}_{action}.png")
         try:
             _icon_base[key] = pygame.image.load(path).convert_alpha()
         except (pygame.error, FileNotFoundError):
             _icon_base[key] = None
     return _icon_base[key]
+
+
+def category_tab_icons(height=32):
+    """Devuelve los hombros reales de Kenney para las pestañas de Opciones."""
+    if not prompts_active():
+        return None
+    mode = "playstation" if _manager.kind == "playstation" else "xbox"
+    indices = (631, 632) if mode == "playstation" else (553, 554)
+    icons = []
+    for index in indices:
+        key = ("kenney_tab", mode, index, height)
+        icon = _icon_scaled.get(key)
+        if icon is None:
+            path = os.path.join("kenney_input-prompts-pixel", "Tiles", f"tile_{index:04d}.png")
+            try:
+                base = pygame.image.load(path).convert_alpha()
+                factor = max(1, math.ceil(height / base.get_height()))
+                icon = pygame.transform.scale_by(base, factor)
+            except (pygame.error, FileNotFoundError):
+                return None
+            _icon_scaled[key] = icon
+        icons.append(icon)
+    return tuple(icons)
 
 
 def _icon_for(mode, action, height):
@@ -169,7 +202,7 @@ def _fallback_text(token, action):
     if prompts_active():
         labels = PROMPT_LABELS.get(_manager.kind, PROMPT_LABELS["xbox"])
         return labels.get(action, token)
-    return token
+    return {"F_APLICAR": "F", "QE_TABS": "Q/E"}.get(token, token)
 
 
 def render_prompt_line(font, text, color, antialias=True):
@@ -669,11 +702,13 @@ class GamepadManager:
             keys.append(pygame.K_ESCAPE)
         if "rest" in pressed and context == "MAP":
             keys.append(pygame.K_r)
+        if "alt" in pressed and context == "OPTIONS":
+            keys.append(pygame.K_f)
         if context in NAV_CONTEXTS:
             if "lb" in pressed:
-                keys.append(pygame.K_LEFT)
+                keys.append(pygame.K_PAGEUP if context == "OPTIONS" else pygame.K_LEFT)
             if "rb" in pressed:
-                keys.append(pygame.K_RIGHT)
+                keys.append(pygame.K_PAGEDOWN if context == "OPTIONS" else pygame.K_RIGHT)
             keys.extend(self._queued_nav_keys)
         self._queued_nav_keys.clear()
 

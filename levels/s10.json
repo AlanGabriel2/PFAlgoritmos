@@ -156,9 +156,9 @@
         },
         {
             "x": 612,
-            "y": 256,
+            "y": 259,
             "w": 106,
-            "h": 64,
+            "h": 61,
             "name": "center_upper_left_void",
             "type": "void",
             "enabled": true
@@ -255,9 +255,9 @@
         },
         {
             "x": 526,
-            "y": 264,
+            "y": 259,
             "w": 96,
-            "h": 47,
+            "h": 52,
             "name": "new_26",
             "type": "solid",
             "enabled": true

@@ -25,6 +25,8 @@ atribución (CC0 o equivalente). Se acreditan de todas formas como cortesía.
   Usado en: disparo del jugador.
 - **200 Free SFX** — por *Kronbits* (kronbits.itch.io/freesfx), CC0.
   Usado en: explosiones, electricidad, alarmas y derrota.
+- **Robot Voice Pack** — por *Cough-E* (opengameart.org/content/robot-voice-pack), CC0.
+  La frase `Initializing.wav` se usa al comenzar la segunda fase del jefe final.
 
 Los efectos placeholder generados por `tools/generate_placeholder_sfx.py` fueron
 reemplazados por esta selección; el script se conserva por si se necesitan de nuevo.

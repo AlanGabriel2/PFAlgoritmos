@@ -6,6 +6,20 @@ from animator import Animator
 from animation_controller import AnimationClip, AnimationController
 from enemy_ai import EnemyNavigator, separation_delta
 
+_boss_projectile_sprite = None
+
+
+def _get_boss_projectile_sprite():
+    global _boss_projectile_sprite
+    if _boss_projectile_sprite is None:
+        try:
+            _boss_projectile_sprite = pygame.image.load(
+                "assets/images/projectiles/boss_corrupted_core.png"
+            ).convert_alpha()
+        except (pygame.error, FileNotFoundError):
+            _boss_projectile_sprite = False
+    return _boss_projectile_sprite
+
 class EnemyBullet:
     def __init__(self, x, y, angle, speed=5, color=(255, 0, 0), radius=5, b_type="normal"):
         self.x = x
@@ -14,6 +28,7 @@ class EnemyBullet:
         self.radius = radius
         self.color = color
         self.b_type = b_type
+        self.angle = angle
         self.dx = math.cos(angle) * self.speed
         self.dy = math.sin(angle) * self.speed
 
@@ -37,12 +52,22 @@ class EnemyBullet:
             pygame.draw.line(surface, (255, 0, 0), (dx - 4, dy + 6), (dx + 1, dy + 6), 2)
             
         elif self.b_type == "boss":
-            # Tomo de tesis gruesa con sello dorado
-            pygame.draw.rect(surface, (139, 0, 0), (dx - 12, dy - 16, 24, 32)) # Tapa roja
-            pygame.draw.rect(surface, (255, 215, 0), (dx - 12, dy - 16, 24, 32), 2) # Borde dorado
-            pygame.draw.rect(surface, (220, 220, 220), (dx + 8, dy - 14, 4, 28)) # Páginas blancas laterales
-            # Texto cruzado o sello dorado en el centro
-            pygame.draw.circle(surface, (255, 215, 0), (int(dx - 2), int(dy)), 6)
+            # Núcleo de datos corrupto: sprite generado, rotado en pasos de 45°
+            # para conservar píxeles nítidos en el ataque radial del jefe.
+            sprite = _get_boss_projectile_sprite()
+            if sprite:
+                rotation = -round(math.degrees(self.angle) / 45.0) * 45
+                image = pygame.transform.rotate(sprite, rotation)
+                # Halo corto y contrastado: comunica energía hostil sobre el suelo oscuro.
+                pulse = 5 + int((math.sin(pygame.time.get_ticks() / 90.0) + 1) * 2)
+                glow = pygame.Surface((pulse * 4, pulse * 4), pygame.SRCALPHA)
+                pygame.draw.circle(glow, (38, 190, 255, 68), (pulse * 2, pulse * 2), pulse * 2)
+                surface.blit(glow, glow.get_rect(center=(int(dx), int(dy))),
+                             special_flags=pygame.BLEND_RGBA_ADD)
+                surface.blit(image, image.get_rect(center=(int(dx), int(dy))))
+            else:
+                pygame.draw.circle(surface, (255, 55, 20), (int(dx), int(dy)), self.radius)
+                pygame.draw.circle(surface, (255, 235, 190), (int(dx), int(dy)), self.radius // 2)
             
         else:
             pygame.draw.circle(surface, self.color, (int(dx), int(dy)), self.radius)
@@ -379,6 +404,7 @@ class DeadlineEnemy(Enemy):
 # ---- Bosses ----
 
 class MiniBoss(Enemy):
+    ATTACK_ANIMATION_LEAD_FRAMES = 16  # frame de impacto 4 a velocidad 0.25
     SCALE_FACTOR = 1.15  # ajuste visual sobre la escala del nivel
 
     def __init__(self, x, y, scale=1.0):
@@ -467,7 +493,9 @@ class MiniBoss(Enemy):
             self.navigator.clear_path()
             self.navigator.mode = "bombard_charge" if self.area_attack_charge_timer > 0 else "bombard_reload"
             self.state = 2
-            self.controller.play("attack")
+            countdown = self.area_attack_charge_timer or self.area_attack_next_round_timer
+            if countdown <= self.ATTACK_ANIMATION_LEAD_FRAMES:
+                self.controller.play("attack")
             return True
 
         if self.jump_timer <= 0:
@@ -1080,7 +1108,8 @@ class MiniBoss(Enemy):
         elif self.action_timer < 150:
             # Telegraph attack
             self.state = 2
-            self.controller.play("attack")
+            if self.action_timer >= 150 - self.ATTACK_ANIMATION_LEAD_FRAMES:
+                self.controller.play("attack")
         else:
             # Shoot
             angle = math.atan2(player_y - self.y, player_x - self.x)
@@ -1091,6 +1120,10 @@ class MiniBoss(Enemy):
 
 class Boss(Enemy):
     SCALE_FACTOR = 1.15  # ajuste visual sobre la escala del nivel
+    PHASE_TWO_HEALTH_RATIO = 0.5
+    PHASE_TRANSITION_FRAMES = 90
+    FAN_SPREAD_DEGREES = (-18, -6, 6, 18)
+    ATTACK_ANIMATION_LEAD_FRAMES = 16  # frame de cañón cargado antes del disparo
 
     def __init__(self, x, y, scale=1.0):
         scale *= self.SCALE_FACTOR
@@ -1106,6 +1139,12 @@ class Boss(Enemy):
             )
         self.configure_standard_controller()
         self.action_timer = 0
+        self.phase = 1
+        self.phase_transition_timer = 0
+        self.next_attack = "radial"
+        self.telegraph_angle = 0.0
+        self.fan_salvos_remaining = 0
+        self.fan_salvo_timer = 0
         
 
     def get_visual_y_offset(self):
@@ -1118,27 +1157,114 @@ class Boss(Enemy):
         pygame.draw.ellipse(shadow, (0, 0, 0, 95), shadow.get_rect())
         surface.blit(shadow, (int(self.x + offset_x - shadow_w / 2), int(self.y + offset_y + self.radius * 0.55 - shadow_h / 2)))
 
+    def _start_phase_two(self):
+        self.phase = 2
+        self.phase_transition_timer = self.PHASE_TRANSITION_FRAMES
+        self.action_timer = 0
+        self.next_attack = "fan"
+        self.fan_salvos_remaining = 0
+        self.fan_salvo_timer = 0
+        self.bullets.clear()
+        self.state = 2
+        self.controller.play("attack", restart=True)
+        audio.play_sfx("boss_phase2_voice")
+
+    def _fire_radial_attack(self):
+        for i in range(8):
+            angle = i * (math.pi / 4)
+            self.bullets.append(EnemyBullet(self.x, self.y, angle, speed=4, radius=12, b_type="boss"))
+        audio.play_sfx("enemy_shoot", "shoot")
+
+    def _begin_fan_attack(self, player_x, player_y):
+        self.telegraph_angle = math.atan2(player_y - self.y, player_x - self.x)
+        self.fan_salvos_remaining = 3
+        self.fan_salvo_timer = 0
+
+    def _update_fan_salvos(self, player_x, player_y):
+        self.state = 2
+        if self.fan_salvo_timer > 0:
+            self.fan_salvo_timer -= 1
+            return
+
+        center_angle = math.atan2(player_y - self.y, player_x - self.x)
+        self.telegraph_angle = center_angle
+        for spread in self.FAN_SPREAD_DEGREES:
+            angle = center_angle + math.radians(spread)
+            self.bullets.append(EnemyBullet(self.x, self.y, angle, speed=5.5, radius=12, b_type="boss"))
+        audio.play_sfx("enemy_shoot", "shoot")
+        self.fan_salvos_remaining -= 1
+        if self.fan_salvos_remaining > 0:
+            self.fan_salvo_timer = 14
+        else:
+            self.action_timer = 0
+
+    def _move_towards_player(self, player_x, player_y):
+        angle = math.atan2(player_y - self.y, player_x - self.x)
+        self.x += math.cos(angle) * self.speed
+        self.y += math.sin(angle) * self.speed
+        self.state = 1
+
     def move_logic(self, player_x, player_y):
-        self.action_timer += 1
-        
-        if self.action_timer < 150:
-            # Move slowly
-            angle = math.atan2(player_y - self.y, player_x - self.x)
-            self.x += math.cos(angle) * self.speed
-            self.y += math.sin(angle) * self.speed
-            self.state = 1
-        elif self.action_timer < 190:
-            # Telegraph
+        if self.phase == 1 and self.hp <= self.max_hp * self.PHASE_TWO_HEALTH_RATIO:
+            self._start_phase_two()
+            return
+
+        if self.phase_transition_timer > 0:
+            self.phase_transition_timer -= 1
             self.state = 2
             self.controller.play("attack")
+            return
+
+        if self.fan_salvos_remaining > 0:
+            self._update_fan_salvos(player_x, player_y)
+            return
+
+        self.action_timer += 1
+
+        move_frames = 150 if self.phase == 1 else 90
+        telegraph_end = move_frames + (40 if self.phase == 1 else 35)
+        if self.action_timer < move_frames:
+            self._move_towards_player(player_x, player_y)
+        elif self.action_timer < telegraph_end:
+            self.state = 2
+            if self.action_timer >= telegraph_end - self.ATTACK_ANIMATION_LEAD_FRAMES:
+                self.controller.play("attack")
+            self.telegraph_angle = math.atan2(player_y - self.y, player_x - self.x)
         else:
-            # Shoot ring of 8 bullets (Null Pointers)
-            for i in range(8):
-                angle = i * (math.pi / 4)
-                self.bullets.append(EnemyBullet(self.x, self.y, angle, speed=4, radius=12, b_type="boss"))
-            audio.play_sfx("enemy_shoot", "shoot")
+            if self.phase == 2 and self.next_attack == "fan":
+                self._begin_fan_attack(player_x, player_y)
+                self.next_attack = "radial"
+            else:
+                self._fire_radial_attack()
+                if self.phase == 2:
+                    self.next_attack = "fan"
             self.action_timer = 0
             self.state = 0
+
+    def draw(self, surface, offset_x=0, offset_y=0):
+        cx = int(self.x + offset_x)
+        cy = int(self.y + offset_y - self.get_visual_y_offset())
+        fx = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+
+        if self.phase_transition_timer > 0:
+            progress = 1.0 - self.phase_transition_timer / self.PHASE_TRANSITION_FRAMES
+            radius = int(75 + progress * 125)
+            alpha = max(20, int(180 * (1.0 - progress)))
+            pygame.draw.circle(fx, (40, 205, 255, alpha), (cx, cy), radius, 4)
+            pygame.draw.circle(fx, (218, 42, 255, alpha // 2), (cx, cy), max(12, radius - 14), 3)
+
+        move_frames = 150 if self.phase == 1 else 90
+        telegraph_end = move_frames + (40 if self.phase == 1 else 35)
+        fan_telegraph = (self.phase == 2 and self.next_attack == "fan" and
+                         move_frames <= self.action_timer < telegraph_end)
+        if fan_telegraph:
+            for spread in (-24, 0, 24):
+                angle = self.telegraph_angle + math.radians(spread)
+                end = (cx + math.cos(angle) * 420, cy + math.sin(angle) * 420)
+                pygame.draw.line(fx, (55, 215, 255, 105), (cx, cy), end, 2)
+
+        surface.blit(fx, (0, 0))
+        super().draw(surface, offset_x, offset_y)
 
 
 # Todos los tipos que pueden aparecer en combate (enemigos + jefes).

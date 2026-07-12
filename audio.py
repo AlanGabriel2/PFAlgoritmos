@@ -37,6 +37,7 @@ SFX_GAIN = {
     "missile_launch": 0.70,
     "missile_impact": 0.90,
     "fire_ignite": 0.65,
+    "boss_phase2_voice": 1.0,
 }
 
 _enabled = False

@@ -1,0 +1,11 @@
+boss_phase2_voice.wav
+
+Original file: Initializing.wav
+Pack: Robot Voice Pack
+Author: Cough-E
+Source: https://opengameart.org/content/robot-voice-pack
+License: Creative Commons Zero (CC0 1.0)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+The author states that the files may be used without credit and waives all
+rights. This notice is retained in the project for provenance.

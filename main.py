@@ -39,6 +39,7 @@ FINAL_BOSS_ROOM_ID = "TIP10TEMTT1"
 COMMON_ENEMY_TYPES = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
 COMMON_ENEMY_WEIGHTS = [5, 2, 2, 1]
 MAP_HUD_H = 140  # alto de la franja del HUD del mapa (los iconos de mando necesitan aire)
+MAP_GAMEPAD_PAN_SPEED = 12.0  # pixeles por paso fijo al mover la camara con el stick derecho
 MINIBOSS_LEVEL_SUFFIX = "boss"
 MINIBOSS_BOSS_LEVEL_KEYS = {"s1", "s4", "s9"}
 DEFEAT_SEQUENCE_FRAMES = 150
@@ -169,11 +170,13 @@ except Exception as e:
 try:
     font_sm = pygame.font.Font("assets/fonts/VT323-Regular.ttf", 20)
     font_md = pygame.font.Font("assets/fonts/VT323-Regular.ttf", 28)
+    font_heading = pygame.font.Font("assets/fonts/VT323-Regular.ttf", 40)
     font_lg = pygame.font.Font("assets/packs/webfontkit-BoldPixels/boldpixels.ttf", 56)
     font_title = pygame.font.Font("assets/packs/webfontkit-BoldPixels/boldpixels.ttf", 100)
 except:
     font_sm = pygame.font.SysFont("Arial", 16)
     font_md = pygame.font.SysFont("Arial", 24)
+    font_heading = pygame.font.SysFont("Arial", 36, bold=True)
     font_lg = pygame.font.SysFont("Arial", 48)
     font_title = pygame.font.SysFont("Arial", 80)
 
@@ -267,10 +270,18 @@ def render_text_fit(font, text, color, max_width, antialias=False):
     if text_surface.get_width() <= max_width:
         return text_surface
 
-    scale = max_width / max(1, text_surface.get_width())
-    new_width = max(1, int(text_surface.get_width() * scale))
-    new_height = max(1, int(text_surface.get_height() * scale))
-    return pygame.transform.scale(text_surface, (new_width, new_height))
+    # Nunca comprimir un bitmap de texto pixel-art: al reducirlo desaparecen
+    # columnas de los glifos. Conservamos el tamaño nativo y abreviamos.
+    suffix = "..."
+    low, high = 0, len(text)
+    while low < high:
+        mid = (low + high + 1) // 2
+        candidate = font.render(text[:mid].rstrip() + suffix, antialias, color)
+        if candidate.get_width() <= max_width:
+            low = mid
+        else:
+            high = mid - 1
+    return font.render(text[:low].rstrip() + suffix, antialias, color)
 
 
 def draw_centered_text_fit(surface, text, font, center, color, max_width, antialias=False):
@@ -548,7 +559,7 @@ def draw_map_hud(surface, semester, par, energy, max_energy, view=None):
     for i in range(max_energy):
         draw_energy_crystal(surface, sx + i * gap, Y(52), i < energy)
 
-    cs = gp_prompt_line(font_sm, "WASD Mover   -   Flechas/Mouse Disparar   -   ENTER Entrar   -   ESPACIO Descansar",
+    cs = gp_prompt_line(font_sm, "WASD Mover   -   Flechas/Mouse Disparar   -   ENTER Entrar   -   ESPACIO Descansar   -   ESC_PAUSA Pausa",
                         MAP_UI["text_dim"], antialias=False)
     # Los iconos se mantienen en su posicion; la barra crecio hacia abajo, asi que
     # el offset desde el fondo sube para dejar mas aire entre iconos y la linea.
@@ -840,6 +851,9 @@ def main():
     death_effects = []  # esquirlas de píxeles de enemigos muriendo
     combat_stats = {"damage": 0, "kills": 0, "start_ms": 0, "end_ms": 0}  # resumen post-combate
     map_unlock_effects = []  # anillos de "materia desbloqueada" en el mapa
+    win_selected = 0
+    win_time = 0
+    win_bg_img = None
 
     def trigger_combat_feedback(stop_frames=0, shake_magnitude=0.0, shake_frames=0):
         nonlocal hit_stop_frames, screen_shake_timer, screen_shake_duration, screen_shake_magnitude
@@ -889,8 +903,12 @@ def main():
                 px = enemy.x - w / 2 + bx + rect.w / 2
                 py = enemy.y - h / 2 + by + rect.h / 2
                 angle = math.atan2(py - enemy.y, px - enemy.x) + random.uniform(-0.6, 0.6)
-                speed = random.uniform(1.2, 3.4)
-                life = random.randint(14, 26)
+                if isinstance(enemy, Boss):
+                    speed = random.uniform(2.2, 6.2)
+                    life = random.randint(45, 90)
+                else:
+                    speed = random.uniform(1.2, 3.4)
+                    life = random.randint(14, 26)
                 death_effects.append({
                     "piece": piece.copy(),
                     "x": px, "y": py,
@@ -930,7 +948,7 @@ def main():
         return None
 
     def trigger_transition(target, t_type="FADE", speed=0.04):
-        nonlocal game_state
+        nonlocal game_state, win_selected, win_time, win_bg_img
         source_state = game_state
         leaving_combat = source_state == "COMBAT" or (
             source_state == "PAUSE" and previous_state == "COMBAT"
@@ -943,6 +961,10 @@ def main():
         trans_state["type"] = t_type
         trans_state["old_surf"] = screen.copy()
         game_state = target
+        if target == "WIN":
+            win_selected = 0
+            win_time = 0
+            win_bg_img = pygame.transform.scale(combat_bg_img, (WIDTH, HEIGHT)) if combat_bg_img else None
         candidates = music_candidates_for(target)
         if candidates:
             audio.play_music(*candidates)
@@ -1349,7 +1371,6 @@ def main():
                         # La ventana se recrea de forma robusta; la logica interna se
                         # mantiene en 1280x720 y solo cambia el escalado final (letterbox).
                         real_screen = apply_display_mode(res, fullscreen)
-                        trigger_transition(options_return_state, "SLIDE_RIGHT" if options_return_state == "MAIN_MENU" else "FADE", 0.05)
             elif game_state == "MAP":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     previous_state = "MAP"
@@ -1464,11 +1485,33 @@ def main():
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
             elif game_state == "WIN":
-                if event.type == pygame.KEYDOWN:
-                    save_mgr.delete_save(current_slot)
-                    main_menu.notification = "¡Nuevo enemigo desbloqueado! La experiencia es rejugable."
-                    main_menu.notification_timer = 300
-                    trigger_transition("MAIN_MENU", "FADE", 0.05)
+                win_buttons = [pygame.Rect(300, 570, 310, 48), pygame.Rect(670, 570, 310, 48)]
+                if event.type == pygame.MOUSEMOTION:
+                    for i, rect in enumerate(win_buttons):
+                        if rect.collidepoint(mouse_x, mouse_y):
+                            win_selected = i
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for i, rect in enumerate(win_buttons):
+                        if rect.collidepoint(mouse_x, mouse_y):
+                            win_selected = i
+                            if i == 0:
+                                trigger_transition("MAP", "CIRCLE", 0.04)
+                            else:
+                                main_menu.notification = "Titulación completada. Partida guardada."
+                                main_menu.notification_timer = 300
+                                trigger_transition("MAIN_MENU", "FADE", 0.05)
+                elif event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_LEFT, pygame.K_UP):
+                        win_selected = (win_selected - 1) % 2
+                    elif event.key in (pygame.K_RIGHT, pygame.K_DOWN):
+                        win_selected = (win_selected + 1) % 2
+                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        if win_selected == 0:
+                            trigger_transition("MAP", "CIRCLE", 0.04)
+                        else:
+                            main_menu.notification = "Titulación completada. Partida guardada."
+                            main_menu.notification_timer = 300
+                            trigger_transition("MAIN_MENU", "FADE", 0.05)
             elif game_state == "GAME_OVER":
                 if event.type == pygame.KEYDOWN and (event.key == pygame.K_r or event.key == pygame.K_SPACE):
                     gamepad.quit()
@@ -1491,6 +1534,16 @@ def main():
                 tutorial_action = tutorial_state.update(keys, WIDTH, HEIGHT, mouse_x, mouse_y, gamepad)
                 if tutorial_action == "FINISH_TUTORIAL":
                     finish_tutorial()
+            elif game_state == "MAP":
+                # El stick izquierdo/D-pad conserva la seleccion entre nodos. El
+                # derecho replica el arrastre con clic derecho para explorar el mapa.
+                pan_x, pan_y = gamepad.get_aim_vector()
+                if pan_x != 0.0 or pan_y != 0.0:
+                    camera_x -= pan_x * MAP_GAMEPAD_PAN_SPEED
+                    camera_y -= pan_y * MAP_GAMEPAD_PAN_SPEED
+                    camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
+            elif game_state == "WIN":
+                win_time += 1
             elif game_state == "COMBAT":
                 world_w, world_h = combat_world_size()
                 if combat_player and combat_player.hp <= 0 and not level_failed_done:
@@ -1615,7 +1668,9 @@ def main():
                                     # y dramatico); los enemigos normales mueren muy
                                     # seguido y pausar la simulacion en cada uno frenaba
                                     # todo el combate.
-                                    if isinstance(e, (MiniBoss, Boss)):
+                                    if isinstance(e, Boss):
+                                        trigger_combat_feedback(18, 7.0, 50)
+                                    elif isinstance(e, MiniBoss):
                                         trigger_combat_feedback(6, 3.0, 14)
                                     enemies.remove(e)
                                     combat_stats["kills"] += 1
@@ -1661,7 +1716,7 @@ def main():
                     # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
                     if current_wave == max_waves and not enemies:
                         if level_passed_timer == 0 and not level_passed_done:
-                            level_passed_timer = 210 # 3.5 s: da tiempo de leer el resumen
+                            level_passed_timer = 300 if current_room == FINAL_BOSS_ROOM_ID else 210
                             combat_stats["end_ms"] = pygame.time.get_ticks()  # congelar el cronómetro
                             audio.play_sfx("level_clear")
                             gamepad.rumble(0.2, 0.4, 150)  # confirmación suave
@@ -1869,7 +1924,11 @@ def main():
                 pygame.draw.rect(screen, (36, 30, 54), panel, 4)
                 pygame.draw.rect(screen, (86, 74, 122), panel, 2)
 
-                title = font_lg.render("¡MATERIA APROBADA!", True, (150, 255, 150))
+                final_clear = current_room == FINAL_BOSS_ROOM_ID
+                clear_title = "SISTEMA CENTRAL DESTRUIDO" if final_clear else "¡MATERIA APROBADA!"
+                title = render_text_fit(font_heading if final_clear else font_lg, clear_title,
+                                        (255, 210, 100) if final_clear else (150, 255, 150),
+                                        panel.width - 40, antialias=False)
                 screen.blit(title, title.get_rect(center=(panel.centerx, panel.top + 46)))
 
                 subject_name = engine.subjects.get(current_room, {}).get("name", "")
@@ -2019,33 +2078,62 @@ def main():
                 draw_defeat_sequence(screen, combat_player, combat_cam_x, combat_cam_y, level_failed_timer, DEFEAT_SEQUENCE_FRAMES)
 
         elif game_state == "WIN":
-            draw_centered_text_fit(
-                screen,
-                f"¡PROYECTO DE TITULACION APROBADO! ¡HAS GANADO!",
-                font_lg,
-                (WIDTH // 2, HEIGHT // 2 - 60),
-                (0, 255, 0),
-                WIDTH - 80,
-                antialias=False,
-            )
-            draw_centered_text_fit(
-                screen,
-                f"Te tomo {semester_counter} Semestres. (El record ideal era {par_score})",
-                font_md,
-                (WIDTH // 2, HEIGHT // 2),
-                TEXT_COLOR,
-                WIDTH - 100,
-                antialias=False,
-            )
-            draw_centered_text_fit(
-                screen,
-                gp_localize("Presiona cualquier tecla para regresar al menu."),
-                font_md,
-                (WIDTH // 2, HEIGHT // 2 + 50),
-                TEXT_COLOR,
-                WIDTH - 100,
-                antialias=False,
-            )
+            if win_bg_img:
+                screen.blit(win_bg_img, (0, 0))
+            veil = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            veil.fill((3, 5, 12, 178))
+            screen.blit(veil, (0, 0))
+
+            # Pulso final alrededor del núcleo de s10.
+            pulse = 72 + int(abs(math.sin(win_time / 24.0)) * 18)
+            pygame.draw.circle(screen, (255, 197, 72), (WIDTH // 2, HEIGHT // 2), pulse, 3)
+            pygame.draw.circle(screen, (50, 205, 255), (WIDTH // 2, HEIGHT // 2), pulse + 12, 2)
+
+            panel = pygame.Rect(170, 76, 940, 566)
+            panel_bg = pygame.Surface(panel.size, pygame.SRCALPHA)
+            panel_bg.fill((18, 20, 25, 228))
+            screen.blit(panel_bg, panel.topleft)
+            pygame.draw.rect(screen, (255, 195, 80), panel, 3)
+            pygame.draw.rect(screen, (92, 101, 112), panel.inflate(-10, -10), 2)
+
+            title = render_text_fit(font_heading, "¡PROYECTO DE TITULACIÓN APROBADO!",
+                                    (255, 218, 125), panel.width - 70, antialias=False)
+            screen.blit(title, title.get_rect(center=(panel.centerx, panel.top + 66)))
+            subtitle = font_md.render("Has derrotado al sistema central y completado la malla curricular.",
+                                      False, (218, 230, 238))
+            screen.blit(subtitle, subtitle.get_rect(center=(panel.centerx, panel.top + 112)))
+
+            end_ms = combat_stats["end_ms"] or pygame.time.get_ticks()
+            elapsed_s = max(0, (end_ms - combat_stats["start_ms"]) // 1000)
+            completed_subjects = sum(1 for state in engine.state.values() if state == NodeState.CLEANED)
+            stats = [
+                ("TIEMPO FINAL", f"{elapsed_s // 60}:{elapsed_s % 60:02d}"),
+                ("DAÑO RECIBIDO", str(combat_stats["damage"])),
+                ("MATERIAS APROBADAS", f"{completed_subjects}/{len(engine.nodes)}"),
+                ("SEMESTRES", f"{semester_counter}  ·  Récord ideal: {par_score}"),
+            ]
+            row_y = panel.top + 172
+            for i, (label, value) in enumerate(stats):
+                rect = pygame.Rect(panel.left + 90, row_y + i * 66, panel.width - 180, 50)
+                pygame.draw.rect(screen, (27, 31, 37), rect)
+                pygame.draw.line(screen, (78, 88, 98), rect.bottomleft, rect.bottomright, 1)
+                lab = font_sm.render(label, False, (157, 174, 187))
+                val = font_md.render(value, False, (255, 235, 184))
+                screen.blit(lab, (rect.left + 18, rect.centery - lab.get_height() // 2))
+                screen.blit(val, val.get_rect(midright=(rect.right - 18, rect.centery)))
+
+            win_buttons = [pygame.Rect(300, 570, 310, 48), pygame.Rect(670, 570, 310, 48)]
+            button_labels = ("Continuar en el mapa", "Volver al menú")
+            for i, rect in enumerate(win_buttons):
+                selected = i == win_selected
+                pygame.draw.rect(screen, (105, 73, 32) if selected else (38, 42, 47), rect)
+                pygame.draw.rect(screen, (255, 205, 105) if selected else (105, 115, 125), rect, 2)
+                label = font_md.render(button_labels[i], False, (255, 244, 218))
+                screen.blit(label, label.get_rect(center=rect.center))
+
+            help_line = gp_prompt_line(font_sm, "FLECHAS Elegir   -   ENTER Confirmar",
+                                       (210, 216, 222), antialias=False)
+            screen.blit(help_line, help_line.get_rect(center=(WIDTH // 2, 674)))
         elif game_state == "GAME_OVER":
             draw_centered_text_fit(
                 screen,
