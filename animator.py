@@ -174,13 +174,21 @@ class Animator:
         if not clip:
             return
 
-        all_frames = [frame for images in self.frames.values() for frame in images] + clip
-        canvas_w = max(frame.get_width() for frame in all_frames)
-        canvas_h = max(frame.get_height() for frame in all_frames)
-        canvas_size = (canvas_w, canvas_h)
+        # Tamaño actual al que ya estan alineados los frames existentes. Los
+        # frames de _get_scaled_frames son uniformes, asi que el maximo es su
+        # tamaño real. Solo re-padeamos TODO si el lienzo crece; en el caso
+        # habitual (varios replace del mismo tamaño) basta con alinear el clip
+        # nuevo, evitando repintar cientos de superficies grandes por entidad.
+        existing = [frame for images in self.frames.values() for frame in images]
+        cur_w = max((frame.get_width() for frame in existing), default=0)
+        cur_h = max((frame.get_height() for frame in existing), default=0)
+        clip_w = max(frame.get_width() for frame in clip)
+        clip_h = max(frame.get_height() for frame in clip)
+        canvas_size = (max(cur_w, clip_w), max(cur_h, clip_h))
 
-        for row, images in list(self.frames.items()):
-            self.frames[row] = [self._pad_frame(frame, canvas_size) for frame in images]
+        if canvas_size != (cur_w, cur_h):
+            for row, images in list(self.frames.items()):
+                self.frames[row] = [self._pad_frame(frame, canvas_size) for frame in images]
         self.frames[state] = [self._pad_frame(frame, canvas_size) for frame in clip]
 
     def set_state(self, row_index):

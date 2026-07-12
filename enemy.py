@@ -140,11 +140,13 @@ class Enemy:
         dy += sep_y
         dx += self.knockback_x
         dy += self.knockback_y
-        self.knockback_x *= 0.55
-        self.knockback_y *= 0.55
-        if abs(self.knockback_x) < 0.05:
+        # Decaimiento rapido: el empujon debe ser un toque breve, no un
+        # desplazamiento largo que deje al enemigo retrocediendo varios frames.
+        self.knockback_x *= 0.4
+        self.knockback_y *= 0.4
+        if abs(self.knockback_x) < 0.1:
             self.knockback_x = 0.0
-        if abs(self.knockback_y) < 0.05:
+        if abs(self.knockback_y) < 0.1:
             self.knockback_y = 0.0
 
         if ignores_map:
@@ -190,7 +192,7 @@ class Enemy:
             dx = self.x - source_x
             dy = self.y - source_y
             distance = max(1.0, math.hypot(dx, dy))
-            strength = 1.5 if isinstance(self, (MiniBoss, Boss)) else 4.0
+            strength = 0.8 if isinstance(self, (MiniBoss, Boss)) else 2.0
             self.knockback_x = dx / distance * strength
             self.knockback_y = dy / distance * strength
         return self.hp <= 0
@@ -247,9 +249,15 @@ class Enemy:
         
         if image:
             if self.hit_flash > 0:
-                # Flash blanco sólido y breve: feedback de impacto al estilo pixel
+                # Flash de impacto: tinte rojo apagado SEMITRANSPARENTE encima del
+                # sprite (el enemigo se sigue viendo debajo). Se construye una
+                # silueta roja solida, se le baja el alfa y se superpone.
                 image = image.copy()
-                image.fill((255, 255, 255), special_flags=pygame.BLEND_RGB_MAX)
+                tint = image.copy()
+                tint.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)   # RGB->0, alfa intacto
+                tint.fill((170, 40, 40, 0), special_flags=pygame.BLEND_RGB_ADD)    # silueta roja
+                tint.fill((255, 255, 255, 150), special_flags=pygame.BLEND_RGBA_MULT)  # ~59% de opacidad
+                image.blit(tint, (0, 0))
             rect = image.get_rect(center=(dx, dy))
             surface.blit(image, rect)
         else:

@@ -126,6 +126,26 @@ def test_replace_state_comparte_lienzo_y_ancla_abajo(tmp_path, animator):
     assert bbox.height == CELL // 2
 
 
+def test_replace_crece_y_luego_reduce_mantiene_lienzo_uniforme(tmp_path, animator):
+    """El lienzo solo crece; un clip posterior mas pequeno se ancla al fondo
+    del lienzo grande sin descuadrar los demas frames (guarda la optimizacion
+    que evita re-padear cuando el tamaño no cambia)."""
+    big = make_sheet(tmp_path / "big.png", rows=1, cols=4, cell=CELL * 2)
+    animator.replace_state_from_sheet(1, big, rows=1, cols=4, frame_height=CELL * 2)
+    grown = {f.get_size() for frames in animator.frames.values() for f in frames}
+    assert len(grown) == 1, "tras crecer, todo comparte el lienzo grande"
+    grown_size = grown.pop()
+
+    small = make_sheet(tmp_path / "small.png", rows=1, cols=4, cell=CELL)
+    animator.replace_state_from_sheet(0, small, rows=1, cols=4, frame_height=CELL)
+    sizes = {f.get_size() for frames in animator.frames.values() for f in frames}
+    assert sizes == {grown_size}, "el lienzo no debe encogerse ni fragmentarse"
+
+    small_frame = animator.frames[0][0]
+    bbox = small_frame.get_bounding_rect()
+    assert bbox.bottom == small_frame.get_height(), "el clip pequeno se ancla al fondo"
+
+
 def test_update_sin_argumento_sigue_funcionando(animator):
     # Camino de reloj real: solo comprobamos que no falla ni retrocede.
     animator.update()

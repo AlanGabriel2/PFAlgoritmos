@@ -34,7 +34,11 @@ MAX_SIM_STEPS = 5  # Tope de pasos de simulacion por frame (evita "spiral of dea
 VALID_FPS_LIMITS = [30, 60, 120, 144, 165, 240, "unlimited"]
 DEFAULT_FPS_LIMIT = 60
 FINAL_BOSS_ROOM_ID = "TIP10TEMTT1"
-MAP_HUD_H = 124  # alto de la franja del HUD del mapa (los iconos de mando necesitan aire)
+# Enemigos comunes y su peso de aparicion. El Bug es el mas debil y basico,
+# asi que domina las oleadas; los mas duros aparecen con menos frecuencia.
+COMMON_ENEMY_TYPES = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
+COMMON_ENEMY_WEIGHTS = [5, 2, 2, 1]
+MAP_HUD_H = 140  # alto de la franja del HUD del mapa (los iconos de mando necesitan aire)
 MINIBOSS_LEVEL_SUFFIX = "boss"
 MINIBOSS_BOSS_LEVEL_KEYS = {"s1", "s4", "s9"}
 DEFEAT_SEQUENCE_FRAMES = 150
@@ -187,9 +191,32 @@ try:
 except Exception:
     pass
 
-preload_combat_assets()
+def _combat_scales():
+    """Escalas de personaje que usan los niveles.
+
+    Precalentar los sprites a su tamaño real (no solo a 1.0) evita el tiron la
+    primera vez que se entra a cada tipo de sala; en los niveles de jefe la
+    escala es 0.7 y el Boss ademas la multiplica por su SCALE_FACTOR, asi que
+    el reescalado de sus hojas (1408x704) se pagaba en pleno combate.
+    """
+    scales = {1.0}
+    try:
+        import json, glob, os
+        for path in glob.glob(os.path.join("levels", "*.json")):
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    scales.add(round(float(json.load(fh).get("character_scale", 0.7)), 3))
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return tuple(sorted(scales))
+
+_preload_scales = _combat_scales()
+preload_combat_assets(scales=_preload_scales)
 try:
-    Player(0, 0)  # calienta también el spritesheet del jugador
+    for _scale in _preload_scales:
+        Player(0, 0, scale=_scale)  # calienta el spritesheet del jugador a cada escala
 except Exception as e:
     print("Preload del jugador fallo:", e)
 
@@ -523,7 +550,9 @@ def draw_map_hud(surface, semester, par, energy, max_energy, view=None):
 
     cs = gp_prompt_line(font_sm, "WASD Mover   -   Flechas/Mouse Disparar   -   ENTER Entrar   -   ESPACIO Descansar",
                         MAP_UI["text_dim"], antialias=False)
-    surface.blit(cs, cs.get_rect(center=(X(WIDTH // 2), Y(HUD_H - 22))))
+    # Los iconos se mantienen en su posicion; la barra crecio hacia abajo, asi que
+    # el offset desde el fondo sube para dejar mas aire entre iconos y la linea.
+    surface.blit(cs, cs.get_rect(center=(X(WIDTH // 2), Y(HUD_H - 38))))
 
 
 def draw_selection_highlight(surface, rect):
@@ -1097,8 +1126,10 @@ def main():
         max_waves = 1 + (semester_counter // 2)
         wave_timer = 300
 
-        enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
-        enemies = [spawn_enemy(random.choice(enemy_types)) for _ in range(random.randint(3, 6))]
+        enemies = [
+            spawn_enemy(random.choices(COMMON_ENEMY_TYPES, weights=COMMON_ENEMY_WEIGHTS)[0])
+            for _ in range(random.randint(3, 6))
+        ]
         if current_room == FINAL_BOSS_ROOM_ID:
             enemies.append(spawn_enemy(Boss, [(world_w // 2, 140)]))
         if is_miniboss_room(current_room) and max_waves == 1:
@@ -1194,7 +1225,14 @@ def main():
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
                 debug_enemy_paths = not debug_enemy_paths
 
-            if game_state == "TITLE_SCREEN":
+            if game_state == "DISCLAIMER_SCREEN":
+                # Saltar el aviso de autoguardado con Espacio/Enter (teclado) o
+                # el boton A del mando (confirm -> K_RETURN en este contexto).
+                # Sin indicador visible: avanza directo a la portada.
+                if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                    trigger_transition("TITLE_SCREEN", "FADE", 0.03)
+
+            elif game_state == "TITLE_SCREEN":
                 action = ui_action(title_screen, event, mouse_x, mouse_y)
                 if action == "START":
                     main_menu.time = 0
@@ -1556,10 +1594,10 @@ def main():
                                 damage = 10
                                 defeated = e.take_damage(damage, b.x, b.y)
                                 audio.play_sfx("hit")
-                                # Los disparos son frecuentes: un temblor muy fuerte
-                                # en cada impacto vuelve la punteria brusca. Conserva
-                                # el hit-stop, pero usa solo una vibracion sutil.
-                                trigger_combat_feedback(2, 0.55, 4)
+                                # Sin hit-stop ni shake al impactar: los disparos son
+                                # muy frecuentes y el hit-stop pausa toda la simulacion,
+                                # lo que hacia sentir a los enemigos lentisimos. El golpe
+                                # se comunica con el flash rojo, el knockback y el sonido.
 
                                 # Generar texto flotante de daño
                                 floating_texts.append({
@@ -1573,11 +1611,12 @@ def main():
                                 if b in combat_player.bullets:
                                     combat_player.bullets.remove(b)
                                 if defeated:
-                                    trigger_combat_feedback(
-                                        5,
-                                        2.25 if isinstance(e, (MiniBoss, Boss)) else 1.2,
-                                        9,
-                                    )
+                                    # Hit-stop solo en la muerte de jefes (evento raro
+                                    # y dramatico); los enemigos normales mueren muy
+                                    # seguido y pausar la simulacion en cada uno frenaba
+                                    # todo el combate.
+                                    if isinstance(e, (MiniBoss, Boss)):
+                                        trigger_combat_feedback(6, 3.0, 14)
                                     enemies.remove(e)
                                     combat_stats["kills"] += 1
                                     spawn_death_effect(e)
@@ -1609,12 +1648,12 @@ def main():
 
                             # Spawn desde la puerta del nivel activo
                             door_x, door_y = int(world_w * 0.85), int(world_h * 0.22)
-                            enemy_types = [BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy]
 
                             for _ in range(random.randint(3, 5)):
                                 ex = door_x + random.randint(-20, 20)
                                 ey = door_y + random.randint(-20, 20)
-                                enemies.append(spawn_enemy(random.choice(enemy_types), [(ex, ey)]))
+                                enemy_cls = random.choices(COMMON_ENEMY_TYPES, weights=COMMON_ENEMY_WEIGHTS)[0]
+                                enemies.append(spawn_enemy(enemy_cls, [(ex, ey)]))
 
                             if current_wave == max_waves and is_miniboss_room(current_room):
                                 enemies.append(spawn_enemy(MiniBoss, [(door_x, door_y)]))
