@@ -1,5 +1,7 @@
 # Dependencia de ejecución del juego
 pygame-ce>=2.5,<3
 
-# Herramientas de desarrollo (tools/normalize_spritesheets.py)
+# Herramientas de desarrollo (tools/normalize_spritesheets.py, tools/validate_spritesheets.py)
 # Pillow>=10
+# Tests (python -m pytest tests/)
+# pytest>=9

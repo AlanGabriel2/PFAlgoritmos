@@ -188,16 +188,22 @@ class Animator:
             self.current_row = row_index
             self.current_frame = 0.0
 
-    def update(self):
+    def update(self, dt_ms=None):
         # Avance basado en tiempo real: la velocidad de animacion es independiente
         # del FPS de render. A 60 FPS coincide exactamente con el comportamiento previo
         # (animation_speed = cuadros de sprite por tick de 60 Hz).
-        now = pygame.time.get_ticks()
-        if self._last_update_ms is None:
+        #
+        # `dt_ms` puede inyectarse desde el game loop (hit-stop = dt_ms=0, tests
+        # deterministas). Sin argumento conserva el comportamiento previo: mide el
+        # tiempo real con pygame.time.get_ticks().
+        if dt_ms is None:
+            now = pygame.time.get_ticks()
+            if self._last_update_ms is None:
+                self._last_update_ms = now
+            dt_ms = now - self._last_update_ms
             self._last_update_ms = now
-        dt_ms = now - self._last_update_ms
-        self._last_update_ms = now
         # Limitar dt para evitar saltos grandes tras una pausa o perdida de foco.
+        # Aplica tambien al dt inyectado para que ambos caminos se comporten igual.
         if dt_ms < 0:
             dt_ms = 0
         elif dt_ms > 100:
