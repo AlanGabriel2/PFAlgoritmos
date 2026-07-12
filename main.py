@@ -1069,7 +1069,6 @@ def main():
             return
         if combat_player:
             combat_player.hp = 0
-            combat_player.state = 0
         level_failed_timer = DEFEAT_SEQUENCE_FRAMES
         audio.play_sfx("level_failed")
         gamepad.rumble(0.8, 1.0, 500)

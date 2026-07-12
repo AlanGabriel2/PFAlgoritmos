@@ -2,6 +2,12 @@ import pygame
 import math
 import random
 import audio
+from animation_controller import AnimationClip, AnimationController
+
+# Frame de la animacion de ataque en el que el disparo "sale" del portatil
+# (destello frontal). La bala y el sfx nacen aqui via evento, no al pulsar,
+# para que el proyectil coincida con el fotograma visual. Tuneable en juego.
+ATTACK_IMPACT_FRAME = 3
 
 font_bullet = None
 BULLET_0_IMG = None
@@ -74,8 +80,20 @@ class Player:
             cols=4,
             frame_height=int(96 * scale),
         )
-        self.state = 0 # 0: Idle, 1: Walk, 2: Attack
         self.flip = False
+
+        # Control de animacion: idle/move en loop de fondo; attack como one-shot
+        # que se dibuja encima sin frenar el movimiento (la posicion es
+        # independiente del clip). La bala nace en el evento "shoot".
+        self.controller = AnimationController(self.animator, {
+            "idle": AnimationClip(state=0, loop=True, priority=0),
+            "move": AnimationClip(state=1, loop=True, priority=0),
+            "attack": AnimationClip(state=2, loop=False, priority=30,
+                                    restart=True,
+                                    events={ATTACK_IMPACT_FRAME: ("shoot",)}),
+        }, base="idle")
+        self._pending_shot = None  # angulo del disparo en vuelo hasta el evento
+        self.controller.bind("shoot", self._release_shot)
 
         # Ancla la hitbox a los pies y la estira hacia arriba hasta cubrir la
         # cabeza (90% del frame; el resto es aire/pelo). Los frames van anclados
@@ -146,25 +164,27 @@ class Player:
             self.sync_position_to_rect()
             self.last_collision = {"x": False, "y": False}
 
-        if moved and self.shoot_cooldown == 0:
-            self.state = 1 # Walk
-        elif self.shoot_cooldown == 0:
-            self.state = 0 # Idle
+        # El clip base refleja el movimiento real; el one-shot de ataque se
+        # dibuja encima sin que esto lo interrumpa.
+        self.controller.set_base("move" if moved else "idle")
 
     def shoot(self, target_x, target_y):
-        if self.shoot_cooldown == 0:
-            angle = math.atan2(target_y - self.y, target_x - self.x)
-            self.bullets.append(Bullet(self.x, self.y, angle))
-            self.shoot_cooldown = 15
-            self.state = 2 # Attack
-            audio.play_sfx("shoot")
+        self.shoot_angle(math.atan2(target_y - self.y, target_x - self.x))
 
     def shoot_angle(self, angle):
+        # El cooldown es decision de gameplay; la bala en cambio nace en el
+        # frame de impacto de la animacion (evento "shoot" -> _release_shot).
         if self.shoot_cooldown == 0:
-            self.bullets.append(Bullet(self.x, self.y, angle))
+            self._pending_shot = angle
             self.shoot_cooldown = 15
-            self.state = 2 # Attack
-            audio.play_sfx("shoot")
+            self.controller.play("attack", restart=True)
+
+    def _release_shot(self):
+        if self._pending_shot is None:
+            return
+        self.bullets.append(Bullet(self.x, self.y, self._pending_shot))
+        self._pending_shot = None
+        audio.play_sfx("shoot")
 
     def take_damage(self, amount):
         """Aplica daño respetando los i-frames; devuelve True si el golpe conectó.
@@ -183,17 +203,16 @@ class Player:
             self.invuln_timer -= 1
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
-            if self.shoot_cooldown == 0:
-                self.state = 0 # Volver a Idle al terminar de atacar
-                
+
         for b in self.bullets[:]:
             b.update()
             if b.is_offscreen(width, height):
                 self.bullets.remove(b)
 
     def draw(self, surface, offset_x=0, offset_y=0):
-        self.animator.set_state(self.state)
-        self.animator.update()
+        # El controller decide el clip (idle/move/attack) y emite el evento
+        # "shoot" en su frame de impacto.
+        self.controller.update()
         image = self.animator.get_current_image()
         
         if image:
