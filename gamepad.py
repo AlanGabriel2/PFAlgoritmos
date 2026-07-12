@@ -146,10 +146,7 @@ def _icon_mode():
 def _load_icon(mode, action):
     key = (mode, action)
     if key not in _icon_base:
-        if mode == "keyboard" and action == "key_f":
-            path = os.path.join("kenney_input-prompts-pixel", "Tiles", "tile_0395.png")
-        else:
-            path = os.path.join(PROMPT_ICON_DIR, f"{mode}_{action}.png")
+        path = os.path.join(PROMPT_ICON_DIR, f"{mode}_{action}.png")
         try:
             _icon_base[key] = pygame.image.load(path).convert_alpha()
         except (pygame.error, FileNotFoundError):
@@ -158,17 +155,16 @@ def _load_icon(mode, action):
 
 
 def category_tab_icons(height=32):
-    """Devuelve los hombros reales de Kenney para las pestañas de Opciones."""
+    """Devuelve los hombros (LB/RB o L1/R1) para las pestañas de Opciones."""
     if not prompts_active():
         return None
     mode = "playstation" if _manager.kind == "playstation" else "xbox"
-    indices = (631, 632) if mode == "playstation" else (553, 554)
     icons = []
-    for index in indices:
-        key = ("kenney_tab", mode, index, height)
+    for action in ("lb", "rb"):
+        key = ("tab", mode, action, height)
         icon = _icon_scaled.get(key)
         if icon is None:
-            path = os.path.join("kenney_input-prompts-pixel", "Tiles", f"tile_{index:04d}.png")
+            path = os.path.join(PROMPT_ICON_DIR, f"{mode}_{action}.png")
             try:
                 base = pygame.image.load(path).convert_alpha()
                 factor = max(1, math.ceil(height / base.get_height()))
