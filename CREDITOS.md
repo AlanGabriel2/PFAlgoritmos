@@ -12,6 +12,11 @@ atribución (CC0 o equivalente). Se acreditan de todas formas como cortesía.
 - **18 High Quality 8-bit Musics** — por *HydroGene* (hydrogene.itch.io/high-quality-8-bit-musics), CC0.
   Usado en: combates (`combat`, `combat_s2`, `combat_s3`), jefes (`boss`, `boss_final`) y victoria (`win`).
 
+## Iconos de botones
+
+- **Input Prompts Pixel 16×16** — por *Kenney* (kenney.nl/assets/input-prompts-pixel-16), CC0.
+  Iconos pixel art de botones de mando y teclas en `assets/images/ui/prompts/`.
+
 ## Efectos de sonido
 
 - **Shapeforms Audio Free Sound Effects** — por *Shapeforms* (shapeforms.itch.io/shapeforms-audio-free-sfx),

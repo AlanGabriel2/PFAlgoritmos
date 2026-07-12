@@ -16,8 +16,12 @@ DEFAULT_GLOBAL_SAVE = {
     "fullscreen": True,
     "aspect_mode": "fit",
     "fps_limit": 60,
-    "tutorial_completed": False
+    "tutorial_completed": False,
+    "gamepad_rumble": True,
+    "gamepad_deadzone": "media"
 }
+
+VALID_DEADZONES = ("baja", "media", "alta")
 
 def _default_global_save():
     data = DEFAULT_GLOBAL_SAVE.copy()
@@ -50,6 +54,9 @@ def load_global_save():
         merged["bestiary_unlocks"] = list(DEFAULT_GLOBAL_SAVE["bestiary_unlocks"])
     merged["volume"] = _normalize_percent(merged.get("volume"), DEFAULT_GLOBAL_SAVE["volume"])
     merged["music_volume"] = _normalize_percent(merged.get("music_volume"), DEFAULT_GLOBAL_SAVE["music_volume"])
+    merged["gamepad_rumble"] = bool(merged.get("gamepad_rumble", True))
+    if merged.get("gamepad_deadzone") not in VALID_DEADZONES:
+        merged["gamepad_deadzone"] = DEFAULT_GLOBAL_SAVE["gamepad_deadzone"]
     return merged
 
 def save_global_save(data):

@@ -298,7 +298,7 @@ def build_default_combat_level(size=(1280, 720)):
     width, height = size
     data = {
         "name": DEFAULT_COMBAT_LEVEL,
-        "background": "assets/images/backgrounds/floor_tile.png",
+        "background": None,
         "size": [width, height],
         "player_spawn": [width // 2, height // 2],
         "pathfinding_cell_size": 24,

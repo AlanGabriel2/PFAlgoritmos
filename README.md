@@ -81,6 +81,8 @@ El mapa dibuja el grafo completo: nodos como salas y aristas como conexiones de 
 - Disparo alternativo: **RT / R2** en la última dirección apuntada
 - Confirmar: **A / Cross** · Volver: **B / Circle** · Pausa: **Start / Options**
 - Descansar en el mapa: **Y / Triangle**
+- Los textos de la interfaz muestran automáticamente los botones del mando detectado
+- En Opciones: **Vibración Mando** (Sí/No) y **Zona Muerta Stick** (Baja/Media/Alta)
 
 ---
 

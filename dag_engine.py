@@ -1,5 +1,18 @@
 from data import SUBJECTS
 
+# Colores de los 8 caminos críticos (aristas del mapa). El tutorial también los
+# usa para mostrar la leyenda de colores.
+PATH_PALETTE = [
+    (180, 20, 40),   # Crimson
+    (20, 160, 60),   # Emerald
+    (30, 80, 180),   # Sapphire
+    (180, 140, 20),  # Gold
+    (20, 140, 140),  # Teal
+    (140, 40, 140),  # Plum
+    (180, 80, 20),   # Rust
+    (80, 40, 160)    # Indigo
+]
+
 class NodeState:
     LOCKED = "LOCKED"
     UNLOCKED = "UNLOCKED"
@@ -72,17 +85,9 @@ class DagEngine:
             
         self.critical_paths = paths
         
-        # Asignar colores únicos a las rutas (Paleta oscura/estética para mejor visualización)
-        palette = [
-            (180, 20, 40),   # Crimson
-            (20, 160, 60),   # Emerald
-            (30, 80, 180),   # Sapphire
-            (180, 140, 20),  # Gold
-            (20, 140, 140),  # Teal
-            (140, 40, 140),  # Plum
-            (180, 80, 20),   # Rust
-            (80, 40, 160)    # Indigo
-        ]
+        # Asignar colores únicos a las rutas (paleta compartida a nivel de módulo
+        # para que el tutorial pueda mostrar los mismos colores).
+        palette = PATH_PALETTE
         
         visited_nodes = set()
         for i, path in enumerate(self.critical_paths):

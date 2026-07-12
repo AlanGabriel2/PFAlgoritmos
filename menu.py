@@ -1,5 +1,6 @@
 import pygame
 import math
+import gamepad
 import save_manager
 from enemy import BugEnemy, SpaghettiEnemy, MemoryLeakEnemy, DeadlineEnemy, MiniBoss, Boss
 
@@ -39,6 +40,33 @@ def frame_delta(obj, max_ms=100.0):
     elif dt > max_ms:
         dt = max_ms
     return dt / (1000.0 / 60.0)
+
+def draw_energy_crystal(surface, cx, cy, filled, px=2):
+    """Gema de energia PIXELADA (diamante escalonado). filled = energia disponible.
+
+    px es el tamaño de cada "pixel" de la gema: 2 en el HUD del mapa; el tutorial
+    la dibuja más grande. Vive aquí para compartirse entre main.py y tutorial.py.
+    """
+    rows = [1, 3, 5, 7, 5, 3, 1]  # medio-ancho de cada fila (en unidades de pixel)
+    if filled:
+        body, hi = (86, 204, 250), (198, 240, 255)
+        edge = (14, 44, 70)
+    else:
+        body, hi = (58, 60, 80), None
+        edge = (34, 36, 50)
+    top = cy - (len(rows) // 2) * px
+    # contorno oscuro (una unidad mas ancho por lado)
+    for i, hw in enumerate(rows):
+        w = (hw + 1) * px
+        pygame.draw.rect(surface, edge, (cx - w // 2, top + i * px, w, px))
+    # cuerpo
+    for i, hw in enumerate(rows):
+        w = hw * px
+        pygame.draw.rect(surface, body, (cx - w // 2, top + i * px, w, px))
+    # brillo superior
+    if hi:
+        pygame.draw.rect(surface, hi, (cx - px, top + px, px, px))
+
 
 def draw_purple_cross_bg(surface, width, height, time_offset=0):
     # Base dark purple
@@ -890,7 +918,7 @@ class BestiaryMenu:
             surface.blit(desc_text, desc_text.get_rect(center=(self.width // 2, desc_y)))
 
         # Back hint (anclada a la esquina inferior izquierda del área visible)
-        back_text = self.font_sm.render("ESC para salir", True, (150, 150, 150))
+        back_text = gamepad.render_prompt_line(self.font_sm, "ESC para salir", (150, 150, 150))
         surface.blit(back_text, (s_left + 40, s_bottom - 40))
 
 class OptionsMenu:
@@ -901,8 +929,18 @@ class OptionsMenu:
         self.font_md = font_md
         self.font_sm = font_sm
 
-        self.options = ["Modo de Pantalla", "Resolución", "Vista de pantalla", "Límite de FPS", "Volumen General", "Volumen Música", "Aplicar y Volver", "Volver sin guardar"]
+        self.options = ["Modo de Pantalla", "Resolución", "Vista de pantalla", "Límite de FPS", "Volumen General", "Volumen Música", "Vibración Mando", "Zona Muerta Stick", "Aplicar y Volver", "Volver sin guardar"]
         self.selected_index = 0
+
+        # Preferencias de mando (persisten en el save global)
+        self.gamepad_rumble = bool(global_data.get("gamepad_rumble", True)) if global_data else True
+        self.deadzone_levels = [("baja", "Baja"), ("media", "Media"), ("alta", "Alta")]
+        saved_deadzone = global_data.get("gamepad_deadzone", "media") if global_data else "media"
+        self.deadzone_index = 1
+        for i, (value, _) in enumerate(self.deadzone_levels):
+            if value == saved_deadzone:
+                self.deadzone_index = i
+                break
 
         # Límite de FPS (independiente de la resolución). "unlimited" = sin límite.
         self.fps_options = [30, 60, 120, 144, 165, 240, "unlimited"]
@@ -980,7 +1018,7 @@ class OptionsMenu:
         self.option_rects = []
         self.arrow_rects = []
         start_y = self.height // 3
-        spacing = 50
+        spacing = 45 if len(self.options) > 8 else 50
 
         for i, option in enumerate(self.options):
             value_str = ""
@@ -998,6 +1036,10 @@ class OptionsMenu:
                 value_str = f"{self.general_volume}%"
             elif option == "Volumen Música":
                 value_str = f"{self.music_volume}%"
+            elif option == "Vibración Mando":
+                value_str = "Sí" if self.gamepad_rumble else "No"
+            elif option == "Zona Muerta Stick":
+                value_str = self.deadzone_levels[self.deadzone_index][1]
 
             display_text = f"  {option}: {value_str}  " if value_str else f"  {option}  "
             if i == self.selected_index:
@@ -1041,7 +1083,7 @@ class OptionsMenu:
                     self.selected_index = i
                     opt = self.options[self.selected_index]
                     if opt == "Aplicar y Volver":
-                        return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume, "fps_limit": self.fps_options[self.fps_index]}
+                        return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume, "fps_limit": self.fps_options[self.fps_index], "gp_rumble": self.gamepad_rumble, "gp_deadzone": self.deadzone_levels[self.deadzone_index][0]}
                     elif opt == "Volver sin guardar":
                         return {"action": "BACK"}
                     else:
@@ -1062,7 +1104,7 @@ class OptionsMenu:
             elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                 opt = self.options[self.selected_index]
                 if opt == "Aplicar y Volver":
-                    return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume, "fps_limit": self.fps_options[self.fps_index]}
+                    return {"action": "APPLY", "fullscreen": self.fullscreen, "res": self.available_resolutions[self.res_index], "aspect_mode": self.aspect_modes[self.aspect_index][0], "gen_vol": self.general_volume, "mus_vol": self.music_volume, "fps_limit": self.fps_options[self.fps_index], "gp_rumble": self.gamepad_rumble, "gp_deadzone": self.deadzone_levels[self.deadzone_index][0]}
                 elif opt == "Volver sin guardar":
                     return {"action": "BACK"}
                 else:
@@ -1085,6 +1127,10 @@ class OptionsMenu:
             self.general_volume = max(0, min(100, self.general_volume + direction * 10))
         elif opt == "Volumen Música":
             self.music_volume = max(0, min(100, self.music_volume + direction * 10))
+        elif opt == "Vibración Mando":
+            self.gamepad_rumble = not self.gamepad_rumble
+        elif opt == "Zona Muerta Stick":
+            self.deadzone_index = (self.deadzone_index + direction) % len(self.deadzone_levels)
 
     def draw(self, surface):
         self.time += frame_delta(self)
@@ -1102,7 +1148,7 @@ class OptionsMenu:
         surface.blit(title_surf, title_rect)
 
         start_y = self.height // 3
-        spacing = 50
+        spacing = 45 if len(self.options) > 8 else 50
 
         for i, option in enumerate(self.options):
             color = (255, 255, 255) if i == self.selected_index else (150, 150, 150)
@@ -1124,6 +1170,10 @@ class OptionsMenu:
                 value_str = f"{self.general_volume}%"
             elif option == "Volumen Música":
                 value_str = f"{self.music_volume}%"
+            elif option == "Vibración Mando":
+                value_str = "Sí" if self.gamepad_rumble else "No"
+            elif option == "Zona Muerta Stick":
+                value_str = self.deadzone_levels[self.deadzone_index][1]
 
             display_text = f"{prefix}{option}: {value_str}{suffix}" if value_str else f"{prefix}{option}{suffix}"
 
@@ -1134,5 +1184,5 @@ class OptionsMenu:
             surface.blit(shadow, (rect.x + 2, rect.y + 2))
             surface.blit(text_surf, rect)
 
-        help_text = self.font_sm.render("Usa las FLECHAS para moverte y cambiar valores. ENTER para seleccionar.", True, (200, 200, 200))
+        help_text = gamepad.render_prompt_line(self.font_sm, "Usa las FLECHAS para moverte y cambiar valores. ENTER para seleccionar.", (200, 200, 200))
         surface.blit(help_text, help_text.get_rect(center=(self.width // 2, safe_edges(self)[3] - 40)))

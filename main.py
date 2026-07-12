@@ -13,9 +13,9 @@ from enemy_ai import draw_enemy_ai_debug
 from pathfinding import PathFinder
 from level import DEFAULT_HAZARD_DAMAGE, DEFAULT_HAZARD_DAMAGE_COOLDOWN, load_combat_level, level_key_from_room_id
 from collision_editor import CollisionEditor
-from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu
+from menu import MainMenu, BestiaryMenu, PauseMenu, TitleScreen, OptionsMenu, DisclaimerScreen, PlaySubMenu, SlotSelectMenu, draw_energy_crystal
 from tutorial import TutorialState
-from gamepad import GamepadManager
+from gamepad import GamepadManager, localize as gp_localize, render_prompt_line as gp_prompt_line
 import audio
 
 # Buffer estable para musica en streaming y efectos con baja latencia.
@@ -34,6 +34,7 @@ MAX_SIM_STEPS = 5  # Tope de pasos de simulacion por frame (evita "spiral of dea
 VALID_FPS_LIMITS = [30, 60, 120, 144, 165, 240, "unlimited"]
 DEFAULT_FPS_LIMIT = 60
 FINAL_BOSS_ROOM_ID = "TIP10TEMTT1"
+MAP_HUD_H = 124  # alto de la franja del HUD del mapa (los iconos de mando necesitan aire)
 MINIBOSS_LEVEL_SUFFIX = "boss"
 MINIBOSS_BOSS_LEVEL_KEYS = {"s1", "s4", "s9"}
 DEFEAT_SEQUENCE_FRAMES = 150
@@ -127,14 +128,6 @@ try:
 except Exception as e:
     print("No se pudo cargar el fondo del mapa:", e)
 
-FLOOR_IMG = None
-try:
-    FLOOR_IMG = pygame.image.load("assets/images/backgrounds/floor_tile.png").convert()
-    # Escalar para llenar la pantalla de combate
-    FLOOR_IMG = pygame.transform.scale(FLOOR_IMG, (WIDTH, HEIGHT))
-except Exception as e:
-    print("No se pudo cargar el suelo:", e)
-
 SAVE_ICON_IMG = None
 try:
     SAVE_ICON_IMG = pygame.image.load("assets/images/ui/save.png").convert_alpha()
@@ -212,8 +205,6 @@ ARENA_H = int(HEIGHT * 1.5)
 def draw_floor(surface, background, offset_x=0, offset_y=0):
     if background:
         surface.blit(background, (int(offset_x), int(offset_y)))
-    elif FLOOR_IMG:
-        surface.blit(FLOOR_IMG, (int(offset_x), int(offset_y)))
     else:
         pygame.draw.rect(surface, (40, 30, 30), (0, 0, WIDTH, HEIGHT))
 
@@ -446,30 +437,6 @@ def draw_pixel_panel(surface, rect, title_h=0, accent=None, fill=(30, 26, 42)):
             pygame.draw.rect(surface, dark, (ax, ay, 3, 3), 1)
 
 
-def draw_energy_crystal(surface, cx, cy, filled):
-    """Gema de energia PIXELADA (diamante escalonado). filled = energia disponible."""
-    px = 2
-    rows = [1, 3, 5, 7, 5, 3, 1]  # medio-ancho de cada fila (en unidades de pixel)
-    if filled:
-        body, hi = (86, 204, 250), (198, 240, 255)
-        edge = (14, 44, 70)
-    else:
-        body, hi = (58, 60, 80), None
-        edge = (34, 36, 50)
-    top = cy - (len(rows) // 2) * px
-    # contorno oscuro (una unidad mas ancho por lado)
-    for i, hw in enumerate(rows):
-        w = (hw + 1) * px
-        pygame.draw.rect(surface, edge, (cx - w // 2, top + i * px, w, px))
-    # cuerpo
-    for i, hw in enumerate(rows):
-        w = hw * px
-        pygame.draw.rect(surface, body, (cx - w // 2, top + i * px, w, px))
-    # brillo superior
-    if hi:
-        pygame.draw.rect(surface, hi, (cx - px, top + px, px, px))
-
-
 def draw_map_hud(surface, semester, par, energy, max_energy, view=None):
     """HUD superior del mapa: barra plana pixel-art con bordes duros.
 
@@ -478,7 +445,7 @@ def draw_map_hud(surface, semester, par, energy, max_energy, view=None):
     Los ejes X se reanclan proporcionalmente al ancho visible; el eje Y solo se
     desplaza hacia el borde superior visible.
     """
-    HUD_H = 104
+    HUD_H = MAP_HUD_H
     left = view.left if view else 0
     top = view.top if view else 0
     right = view.right if view else WIDTH
@@ -523,9 +490,9 @@ def draw_map_hud(surface, semester, par, energy, max_energy, view=None):
     for i in range(max_energy):
         draw_energy_crystal(surface, sx + i * gap, Y(52), i < energy)
 
-    controls = "WASD Mover   -   Flechas/Mouse Disparar   -   ENTER Entrar   -   ESPACIO Descansar"
-    cs = font_sm.render(controls, False, MAP_UI["text_dim"])
-    surface.blit(cs, cs.get_rect(center=(X(WIDTH // 2), Y(84))))
+    cs = gp_prompt_line(font_sm, "WASD Mover   -   Flechas/Mouse Disparar   -   ENTER Entrar   -   ESPACIO Descansar",
+                        MAP_UI["text_dim"], antialias=False)
+    surface.blit(cs, cs.get_rect(center=(X(WIDTH // 2), Y(HUD_H - 22))))
 
 
 def draw_selection_highlight(surface, rect):
@@ -631,6 +598,10 @@ def main():
     global screen, real_screen
     clock = pygame.time.Clock()
     gamepad = GamepadManager()
+    gamepad.set_preferences(
+        rumble_enabled=global_data.get("gamepad_rumble", True),
+        deadzone_name=global_data.get("gamepad_deadzone", "media"),
+    )
 
     audio.init(global_data.get("volume", 100), global_data.get("music_volume", 100))
     audio.play_music("menu")
@@ -709,7 +680,7 @@ def main():
         min_y = min(r.rect.top for r in rooms.values())
         max_y = max(r.rect.bottom for r in rooms.values())
         pad = 140      # aire permitido más allá de los bordes del mapa
-        hud_h = 104    # franja del HUD superior dentro del área visible
+        hud_h = MAP_HUD_H    # franja del HUD superior dentro del área visible
 
         view = map_view_rect()
         view_left, view_right = view.left, view.right
@@ -783,7 +754,7 @@ def main():
     current_level = load_combat_level(fallback_size=(ARENA_W, ARENA_H))
     collision_manager = current_level.create_collision_manager()
     pathfinder = PathFinder(current_level)
-    combat_bg_img = FLOOR_IMG
+    combat_bg_img = None
     debug_collisions = False
     debug_collision_labels = False
     debug_enemy_paths = False
@@ -898,8 +869,6 @@ def main():
                 return image
         except Exception as e:
             print(f"No se pudo cargar el fondo del nivel {level.name}: {e}")
-        if FLOOR_IMG:
-            return pygame.transform.scale(FLOOR_IMG, tuple(level.size))
         return None
 
     def is_miniboss_room(room_id):
@@ -1035,6 +1004,7 @@ def main():
             combat_player.state = 0
         level_failed_timer = DEFEAT_SEQUENCE_FRAMES
         audio.play_sfx("level_failed")
+        gamepad.rumble(0.8, 1.0, 500)
 
     load_room_level(None)
 
@@ -1078,7 +1048,7 @@ def main():
                 if selected_node in map_gen.rooms:
                     _mv = map_view_rect()
                     camera_x = _mv.centerx - map_gen.rooms[selected_node].rect.centerx
-                    camera_y = (_mv.top + 104 + _mv.bottom)//2 - map_gen.rooms[selected_node].rect.centery
+                    camera_y = (_mv.top + MAP_HUD_H + _mv.bottom)//2 - map_gen.rooms[selected_node].rect.centery
                     camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
 
         frame_events = pygame.event.get()
@@ -1221,8 +1191,14 @@ def main():
                         global_data["volume"] = gen_vol
                         global_data["music_volume"] = action.get("mus_vol", global_data.get("music_volume", 100))
                         global_data["fps_limit"] = fps_limit
+                        global_data["gamepad_rumble"] = action.get("gp_rumble", global_data.get("gamepad_rumble", True))
+                        global_data["gamepad_deadzone"] = action.get("gp_deadzone", global_data.get("gamepad_deadzone", "media"))
                         save_mgr.save_global_save(global_data)
                         audio.set_volumes(gen_vol, global_data["music_volume"])
+                        gamepad.set_preferences(
+                            rumble_enabled=global_data["gamepad_rumble"],
+                            deadzone_name=global_data["gamepad_deadzone"],
+                        )
 
                         # La ventana se recrea de forma robusta; la logica interna se
                         # mantiene en 1280x720 y solo cambia el escalado final (letterbox).
@@ -1308,7 +1284,7 @@ def main():
                                 target_room = map_gen.rooms[selected_node]
                                 _mv = map_view_rect()
                                 camera_x = _mv.centerx - target_room.rect.centerx
-                                camera_y = (_mv.top + 104 + _mv.bottom)//2 - target_room.rect.centery
+                                camera_y = (_mv.top + MAP_HUD_H + _mv.bottom)//2 - target_room.rect.centery
                                 camera_x, camera_y = clamp_map_camera(camera_x, camera_y)
 
             elif game_state == "COMBAT":
@@ -1413,7 +1389,10 @@ def main():
                             combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
                             enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
                             audio.play_sfx("hurt")
-                            gamepad.rumble()
+                            if isinstance(enemy, (MiniBoss, Boss)):
+                                gamepad.rumble(0.7, 1.0, 220)  # golpe de jefe: vibración fuerte
+                            else:
+                                gamepad.rumble()
 
                         # El jugador recibe daño por balas enemigas
                         for b in enemy.bullets[:]:
@@ -1492,6 +1471,7 @@ def main():
                         if level_passed_timer == 0 and not level_passed_done:
                             level_passed_timer = 120 # 2 segundos
                             audio.play_sfx("level_clear")
+                            gamepad.rumble(0.2, 0.4, 150)  # confirmación suave
 
                         if level_passed_timer > 0:
                             level_passed_timer -= 1
@@ -1776,7 +1756,7 @@ def main():
             )
             draw_centered_text_fit(
                 screen,
-                "Presiona cualquier tecla para regresar al menu.",
+                gp_localize("Presiona cualquier tecla para regresar al menu."),
                 font_md,
                 (WIDTH // 2, HEIGHT // 2 + 50),
                 TEXT_COLOR,
@@ -1795,7 +1775,7 @@ def main():
             )
             draw_centered_text_fit(
                 screen,
-                "Presiona 'R' para reintentar el nivel.",
+                gp_localize("Presiona 'R' para reintentar el nivel."),
                 font_md,
                 (WIDTH // 2, HEIGHT // 2 + 50),
                 TEXT_COLOR,

@@ -1,6 +1,8 @@
 """Gamepad input with stable joystick polling and event fallbacks."""
 
 import math
+import os
+import re
 
 import pygame
 
@@ -10,8 +12,6 @@ except (ImportError, pygame.error):
     sdl_controller = None
 
 
-MOVE_DEADZONE = 0.22
-AIM_DEADZONE = 0.28
 NAV_THRESHOLD = 0.55
 NAV_INITIAL_DELAY_MS = 320
 NAV_REPEAT_MS = 115
@@ -19,6 +19,210 @@ TRIGGER_THRESHOLD = 0.38
 
 NAV_CONTEXTS = {"MAIN_MENU", "SLOT_SELECT", "PAUSE", "BESTIARY", "OPTIONS", "MAP"}
 BACK_CONTEXTS = {"MAIN_MENU", "SLOT_SELECT", "PAUSE", "BESTIARY", "OPTIONS"}
+
+# Zonas muertas seleccionables desde Opciones (la de apuntado va un poco más alta
+# para que el disparo no se active con el stick apenas rozado).
+DEADZONE_PRESETS = {
+    "baja": 0.15,
+    "media": 0.22,
+    "alta": 0.32,
+}
+DEFAULT_DEADZONE = "media"
+AIM_DEADZONE_EXTRA = 0.06
+
+# ---------------------------------------------------------------------------
+# Prompts de botones: la UI sustituye las teclas por el botón del mando cuando
+# el último input vino del mando. Etiquetas en texto plano (la fuente VT323 no
+# tiene glifos de botones).
+# ---------------------------------------------------------------------------
+PROMPT_LABELS = {
+    "xbox": {
+        "confirm": "A", "back": "B", "alt": "X", "rest": "Y",
+        "pause": "START", "navigate": "D-PAD",
+        "move": "STICK IZQ", "aim": "STICK DER",
+    },
+    "playstation": {
+        "confirm": "X", "back": "O", "alt": "CUADRADO", "rest": "TRIANGULO",
+        "pause": "OPTIONS", "navigate": "D-PAD",
+        "move": "STICK IZQ", "aim": "STICK DER",
+    },
+}
+PROMPT_LABELS["controller"] = PROMPT_LABELS["xbox"]
+PROMPT_LABELS["generic"] = PROMPT_LABELS["xbox"]
+
+# Sustituciones aplicadas a los textos de la UI cuando el mando está activo.
+# El orden importa: primero las frases largas para no romperlas con las cortas.
+# Solo tokens en MAYÚSCULAS o entre comillas: no tocan palabras normales.
+_LOCALIZE_RULES = (
+    ("ESPACIO o ENTER", "confirm"),
+    ("las FLECHAS", "el D-PAD"),
+    ("FLECHAS", "navigate"),
+    ("Flechas/Mouse", "aim"),
+    ("WASD", "move"),
+    ("ENTER", "confirm"),
+    ("ESPACIO", "rest"),
+    ("ESC", "back"),
+    ("'R'", "confirm"),
+    ("cualquier tecla", "cualquier boton"),
+)
+
+_manager = None  # instancia activa; la registra GamepadManager al crearse
+
+
+def prompts_active():
+    """True si la UI debe mostrar botones de mando en vez de teclas."""
+    return _manager is not None and _manager.connected and _manager.last_input_source == "gamepad"
+
+
+def prompt(action):
+    """Etiqueta del botón para una acción según el mando activo (o None)."""
+    if not prompts_active():
+        return None
+    labels = PROMPT_LABELS.get(_manager.kind, PROMPT_LABELS["xbox"])
+    return labels.get(action)
+
+
+def localize(text):
+    """Adapta un texto de UI al mando activo; lo devuelve intacto con teclado."""
+    if not prompts_active():
+        return text
+    labels = PROMPT_LABELS.get(_manager.kind, PROMPT_LABELS["xbox"])
+    for token, target in _LOCALIZE_RULES:
+        if token in text:
+            # target es una acción con etiqueta (confirm, rest...) o un literal.
+            text = text.replace(token, labels.get(target, target))
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Renderizado de texto con ICONOS de botón/tecla intercalados (pack de Kenney
+# en assets/images/ui/prompts, nombrados <modo>_<accion>.png). Si falta un
+# icono se degrada al texto de localize(), así que nunca se rompe nada.
+# ---------------------------------------------------------------------------
+PROMPT_ICON_DIR = os.path.join("assets", "images", "ui", "prompts")
+ICON_SIDE_PAD = 3  # aire horizontal alrededor de cada icono, en píxeles
+
+# (token en el texto original) -> acción. Mismo espíritu que _LOCALIZE_RULES,
+# más los tokens exclusivos de mando (RT/R2). El orden importa.
+_RENDER_RULES = (
+    ("ESPACIO o ENTER", "confirm"),
+    ("Flechas/Mouse", "aim"),
+    ("las FLECHAS", "navigate"),
+    ("FLECHAS", "navigate"),
+    ("WASD", "move"),
+    ("RT/R2", "trigger"),
+    ("ENTER", "confirm"),
+    ("ESPACIO", "rest"),
+    ("ESC", "back"),
+    ("'R'", "confirm"),
+)
+_RENDER_TOKEN_ACTION = dict(_RENDER_RULES)
+_RENDER_PATTERN = re.compile("|".join(re.escape(token) for token, _ in _RENDER_RULES))
+
+# En modo teclado solo estas acciones tienen icono de tecla; el resto (move,
+# aim, trigger) se queda como texto original ("WASD", "Flechas/Mouse"...).
+_KEYBOARD_ICON_ACTIONS = {"confirm", "back", "rest", "navigate", "key_r"}
+# Con teclado, algunos tokens usan su propia tecla en vez de la acción genérica
+# (p. ej. 'R' de reintentar debe mostrar la tecla R, no ENTER).
+_KEYBOARD_TOKEN_OVERRIDES = {"'R'": "key_r"}
+
+_icon_base = {}    # (modo, accion) -> Surface base o None si no existe el PNG
+_icon_scaled = {}  # (modo, accion, alto) -> Surface escalada
+
+
+def _icon_mode():
+    if prompts_active():
+        return "playstation" if _manager.kind == "playstation" else "xbox"
+    return "keyboard"
+
+
+def _load_icon(mode, action):
+    key = (mode, action)
+    if key not in _icon_base:
+        path = os.path.join(PROMPT_ICON_DIR, f"{mode}_{action}.png")
+        try:
+            _icon_base[key] = pygame.image.load(path).convert_alpha()
+        except (pygame.error, FileNotFoundError):
+            _icon_base[key] = None
+    return _icon_base[key]
+
+
+def _icon_for(mode, action, height):
+    key = (mode, action, height)
+    scaled = _icon_scaled.get(key)
+    if scaled is None:
+        base = _load_icon(mode, action)
+        if base is None:
+            return None
+        # Los iconos son pixel art de 16px: se escalan solo por factores enteros
+        # y con vecino-mas-cercano para que queden nitidos (sin difuminado).
+        # ceil: el icono nunca queda mas chico que el texto (en fuentes pequenas
+        # el redondeo hacia abajo los dejaba de 16px y se veian poco claros).
+        factor = max(1, math.ceil(height / base.get_height()))
+        scaled = pygame.transform.scale_by(base, factor)
+        _icon_scaled[key] = scaled
+    return scaled
+
+
+def _fallback_text(token, action):
+    """Texto a usar cuando no hay icono para el token."""
+    if prompts_active():
+        labels = PROMPT_LABELS.get(_manager.kind, PROMPT_LABELS["xbox"])
+        return labels.get(action, token)
+    return token
+
+
+def render_prompt_line(font, text, color, antialias=True):
+    """Renderiza una línea de UI con iconos de tecla/botón según el input activo.
+
+    Devuelve una Surface (con alfa) intercambiable por la de font.render():
+    admite get_rect(), set_alpha() y blit igual que un texto normal.
+    """
+    mode = _icon_mode()
+    icon_h = font.get_height()
+    segments = []
+    pos = 0
+    for match in _RENDER_PATTERN.finditer(text):
+        token = match.group(0)
+        action = _RENDER_TOKEN_ACTION[token]
+        if mode == "keyboard":
+            action = _KEYBOARD_TOKEN_OVERRIDES.get(token, action)
+            if action not in _KEYBOARD_ICON_ACTIONS:
+                continue  # con teclado, WASD / Flechas-Mouse se quedan como texto
+        if match.start() > pos:
+            segments.append(("text", text[pos:match.start()]))
+        icon = _icon_for(mode, action, icon_h)
+        if icon is not None:
+            segments.append(("icon", icon))
+        else:
+            segments.append(("text", _fallback_text(token, action)))
+        pos = match.end()
+    if pos < len(text):
+        segments.append(("text", text[pos:]))
+
+    surfaces = []
+    for kind, value in segments:
+        if kind == "text":
+            if value:
+                surfaces.append(("text", font.render(value, antialias, color)))
+        else:
+            surfaces.append(("icon", value))
+    if not surfaces:
+        return font.render(text, antialias, color)
+
+    total_w = sum(s.get_width() + (ICON_SIDE_PAD * 2 if kind == "icon" else 0)
+                  for kind, s in surfaces)
+    total_h = max(s.get_height() for _, s in surfaces)
+    out = pygame.Surface((total_w, total_h), pygame.SRCALPHA)
+    x = 0
+    for kind, s in surfaces:
+        if kind == "icon":
+            x += ICON_SIDE_PAD
+        out.blit(s, (x, (total_h - s.get_height()) // 2))
+        x += s.get_width()
+        if kind == "icon":
+            x += ICON_SIDE_PAD
+    return out
 
 # Perfiles de ejes CRUDOS (solo fallback: se usan únicamente si el mando no es
 # reconocido por la API de Game Controller de SDL, que ya normaliza el layout).
@@ -251,9 +455,26 @@ class GamepadManager:
         self._queued_nav_keys = []
         self._status_message = None
         self._last_scan_ms = 0
+        self.last_input_source = "keyboard"
+        self.rumble_enabled = True
+        self.deadzone_name = DEFAULT_DEADZONE
+        self.move_deadzone = DEADZONE_PRESETS[DEFAULT_DEADZONE]
+        self.aim_deadzone = self.move_deadzone + AIM_DEADZONE_EXTRA
+
+        global _manager
+        _manager = self
 
         if scan_devices:
             self.refresh_devices()
+
+    def set_preferences(self, rumble_enabled=None, deadzone_name=None):
+        """Aplica las preferencias del menú de opciones (vibración y zona muerta)."""
+        if rumble_enabled is not None:
+            self.rumble_enabled = bool(rumble_enabled)
+        if deadzone_name is not None and deadzone_name in DEADZONE_PRESETS:
+            self.deadzone_name = deadzone_name
+            self.move_deadzone = DEADZONE_PRESETS[deadzone_name]
+            self.aim_deadzone = self.move_deadzone + AIM_DEADZONE_EXTRA
 
     @property
     def active_device(self):
@@ -361,6 +582,18 @@ class GamepadManager:
         }.get(action)
 
     def handle_event(self, event):
+        # Rastrear el origen del último input para que la UI muestre teclas o
+        # botones según corresponda. Los KEYDOWN sintéticos del propio mando
+        # llevan gamepad=True y no cuentan como teclado.
+        if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+            if not getattr(event, "gamepad", False):
+                self.last_input_source = "keyboard"
+            return
+        if event.type in (pygame.JOYBUTTONDOWN, pygame.CONTROLLERBUTTONDOWN, pygame.JOYHATMOTION):
+            self.last_input_source = "gamepad"
+        elif event.type == pygame.CONTROLLERAXISMOTION and abs(event.value) > 16000:
+            self.last_input_source = "gamepad"
+
         if event.type in (pygame.JOYDEVICEADDED, pygame.CONTROLLERDEVICEADDED):
             device_index = getattr(event, "device_index", None)
             if device_index is not None:
@@ -488,13 +721,13 @@ class GamepadManager:
         device = self.active_device
         if device is None:
             return 0.0, 0.0
-        return apply_radial_deadzone(device.axis("left_x"), device.axis("left_y"), MOVE_DEADZONE)
+        return apply_radial_deadzone(device.axis("left_x"), device.axis("left_y"), self.move_deadzone)
 
     def get_aim_vector(self):
         device = self.active_device
         if device is None:
             return 0.0, 0.0
-        aim = apply_radial_deadzone(device.axis("right_x"), device.axis("right_y"), AIM_DEADZONE)
+        aim = apply_radial_deadzone(device.axis("right_x"), device.axis("right_y"), self.aim_deadzone)
         if math.hypot(*aim) > 0.0:
             magnitude = math.hypot(*aim)
             self._last_aim = aim[0] / magnitude, aim[1] / magnitude
@@ -512,7 +745,7 @@ class GamepadManager:
 
     def rumble(self, low_frequency=0.35, high_frequency=0.65, duration_ms=140):
         device = self.active_device
-        if device is None:
+        if device is None or not self.rumble_enabled:
             return False
         return device.rumble(low_frequency, high_frequency, duration_ms)
 

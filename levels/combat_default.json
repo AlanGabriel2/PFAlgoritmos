@@ -1,6 +1,6 @@
 {
     "name": "combat_default",
-    "background": "assets/images/backgrounds/floor_tile.png",
+    "background": null,
     "size": [
         1280,
         720
