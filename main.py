@@ -1459,6 +1459,7 @@ def main():
                             contact_damage = 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
                             if combat_player.take_damage(contact_damage):
                                 enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
+                                enemy.notify_attack()
                                 combat_stats["damage"] += contact_damage
                                 audio.play_sfx("hurt")
                                 if isinstance(enemy, (MiniBoss, Boss)):

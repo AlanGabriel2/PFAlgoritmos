@@ -3,6 +3,7 @@ import math
 import random
 import audio
 from animator import Animator
+from animation_controller import AnimationClip, AnimationController
 from enemy_ai import EnemyNavigator, separation_delta
 
 class EnemyBullet:
@@ -174,6 +175,16 @@ class Enemy:
     def draw_movement_shadow(self, surface, offset_x=0, offset_y=0, visual_y_offset=0):
         pass
 
+    def notify_attack(self):
+        """El gameplay avisa que este enemigo conecto un golpe.
+
+        En entidades migradas al AnimationController dispara el one-shot de
+        ataque; en las demas no hace nada (siguen con el state numerico).
+        """
+        controller = getattr(self, "controller", None)
+        if controller is not None:
+            controller.play("attack")
+
     def move_logic(self, player_x, player_y):
         angle = math.atan2(player_y - self.y, player_x - self.x)
         self.x += math.cos(angle) * self.speed
@@ -181,8 +192,14 @@ class Enemy:
         self.state = 1 # Moving
 
     def draw(self, surface, offset_x=0, offset_y=0):
-        self.animator.set_state(self.state)
-        self.animator.update()
+        controller = getattr(self, "controller", None)
+        if controller is not None:
+            # Entidad migrada: el controller decide el clip; el state numerico
+            # que aun escriba la IA heredada se ignora.
+            controller.update()
+        else:
+            self.animator.set_state(self.state)
+            self.animator.update()
         image = self.animator.get_current_image()
         
         visual_y_offset = self.get_visual_y_offset()
@@ -216,6 +233,10 @@ class Enemy:
 # ---- Normal Enemies ----
 
 class BugEnemy(Enemy):
+    """Piloto de la migracion al AnimationController: su animacion la decide
+    el controller (idle/move segun desplazamiento real, attack como one-shot
+    al conectar un golpe), no el state numerico heredado."""
+
     def __init__(self, x, y, scale=1.0):
         # Tamaño escalado un poco más pequeño
         super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet_normalized.png", 54, cols=6, scale=scale, collision_scale=0.82)
@@ -226,6 +247,19 @@ class BugEnemy(Enemy):
                 state, f"assets/images/enemies/generated/bug_{name}_v2_alpha_master_normalized.png",
                 rows=2, cols=4, frame_height=int(54 * scale),
             )
+        self.controller = AnimationController(self.animator, {
+            "idle": AnimationClip(state=0, loop=True, priority=0),
+            "move": AnimationClip(state=1, loop=True, priority=0),
+            "attack": AnimationClip(state=2, loop=False, priority=30),
+        }, base="move")
+
+    def update(self, player_x, player_y, width, height, collision_manager=None, pathfinder=None, nearby_enemies=None):
+        old_x, old_y = self.x, self.y
+        super().update(player_x, player_y, width, height, collision_manager, pathfinder, nearby_enemies)
+        # Base segun desplazamiento real: si quedo bloqueado o acorralado se ve
+        # en reposo en vez de "patinar" con la animacion de caminar.
+        moved = math.hypot(self.x - old_x, self.y - old_y) > 0.3
+        self.controller.set_base("move" if moved else "idle")
 class SpaghettiEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
         super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet_normalized.png", 72, scale=scale, collision_scale=0.70)
