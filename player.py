@@ -45,7 +45,33 @@ class Player:
         self._move_residual_y = 0.0
         
         from animator import Animator
-        self.animator = Animator("assets/images/player/player_sheet.png", int(96 * scale), int(96 * scale), rows=3, cols=4, animation_speed=0.10)
+        self.animator = Animator(
+            "assets/images/player/player_sheet_normalized.png",
+            int(96 * scale), int(96 * scale), rows=3, cols=4,
+            animation_speed=0.10,
+            state_speeds={0: 0.06, 1: 0.16, 2: 0.52},
+        )
+        self.animator.replace_state_from_sheet(
+            0,
+            "assets/images/player/generated/player_idle_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(96 * scale),
+        )
+        self.animator.replace_state_from_sheet(
+            1,
+            "assets/images/player/generated/player_walk_v3_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(96 * scale),
+        )
+        self.animator.replace_state_from_sheet(
+            2,
+            "assets/images/player/generated/player_attack_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(96 * scale),
+        )
         self.state = 0 # 0: Idle, 1: Walk, 2: Attack
         self.flip = False
 

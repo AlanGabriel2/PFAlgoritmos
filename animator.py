@@ -1,4 +1,5 @@
 import pygame
+from statistics import median
 
 # Frames cortados a tamaño NATIVO (sin escalar), por spritesheet. Esta es la parte
 # CARA (leer disco + convert_alpha + recortar cada frame + bounding-rect) y se hace
@@ -89,15 +90,38 @@ def _get_scaled_frames(path, target_height, rows, cols, transpose):
         _scaled_cache[key] = frames
         return frames
 
-    frames = {}
+    # Todos los fotogramas de una hoja comparten escala y lienzo. Antes cada bbox
+    # se forzaba por separado a target_height: un brazo extendido o un efecto hacía
+    # que el cuerpo cambiara de tamaño y que los pies vibraran entre fotogramas.
+    # La primera animación (idle) define la altura visual de referencia.
+    reference_images = native.get(0) or next(iter(native.values()), [])
+    reference_heights = [image.get_height() for image in reference_images if image.get_height() > 0]
+    reference_height = median(reference_heights) if reference_heights else max(1, target_height)
+    uniform_scale = target_height / max(1, reference_height)
+
+    scaled_by_state = {}
+    canvas_w = 1
+    canvas_h = 1
     for state, images in native.items():
+        scaled_by_state[state] = []
+        for image in images:
+            new_w = max(1, int(round(image.get_width() * uniform_scale)))
+            new_h = max(1, int(round(image.get_height() * uniform_scale)))
+            scaled = pygame.transform.scale(image, (new_w, new_h))
+            scaled_by_state[state].append(scaled)
+            canvas_w = max(canvas_w, new_w)
+            canvas_h = max(canvas_h, new_h)
+
+    frames = {}
+    for state, images in scaled_by_state.items():
         frames[state] = []
         for image in images:
-            if image.get_height() > 0:
-                aspect_ratio = image.get_width() / image.get_height()
-                new_width = max(1, int(target_height * aspect_ratio))
-                image = pygame.transform.scale(image, (new_width, int(target_height)))
-            frames[state].append(image)
+            canvas = pygame.Surface((canvas_w, canvas_h), pygame.SRCALPHA)
+            # Anclaje común: centro inferior (pies/contacto con el suelo).
+            x = (canvas_w - image.get_width()) // 2
+            y = canvas_h - image.get_height()
+            canvas.blit(image, (x, y))
+            frames[state].append(canvas)
 
     _scaled_cache[key] = frames
     return frames
@@ -111,10 +135,12 @@ def preload_spritesheet(path, frame_height, rows, cols, transpose=False):
 
 
 class Animator:
-    def __init__(self, spritesheet_path, frame_width, frame_height, rows, cols, animation_speed=0.15, transpose=False):
+    def __init__(self, spritesheet_path, frame_width, frame_height, rows, cols,
+                 animation_speed=0.15, transpose=False, state_speeds=None):
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.animation_speed = animation_speed
+        self.state_speeds = dict(state_speeds or {})
 
         self.current_row = 0
         self.current_frame = 0.0
@@ -123,6 +149,39 @@ class Animator:
         # Los frames vienen del caché compartido: el primer uso de la hoja hace el
         # corte nativo (una vez) y el escalado a esta altura (una vez por escala).
         self.frames = _get_scaled_frames(spritesheet_path, frame_height, rows, cols, transpose)
+
+    @staticmethod
+    def _pad_frame(image, canvas_size):
+        """Alinea un frame al centro inferior de un lienzo compartido."""
+        canvas_w, canvas_h = canvas_size
+        canvas = pygame.Surface(canvas_size, pygame.SRCALPHA)
+        x = (canvas_w - image.get_width()) // 2
+        y = canvas_h - image.get_height()
+        canvas.blit(image, (x, y))
+        return canvas
+
+    def replace_state_from_sheet(self, state, spritesheet_path, rows, cols,
+                                 frame_height=None, transpose=False):
+        """Sustituye un estado con un clip externo y mantiene el mismo pivote.
+
+        Los frames se leen por filas. Esto permite que acciones amplias (ataques,
+        muerte, aparición) vivan en hojas propias sin invadir las celdas de idle o
+        movimiento.
+        """
+        height = int(frame_height or self.frame_height)
+        clip_states = _get_scaled_frames(spritesheet_path, height, rows, cols, transpose)
+        clip = [frame for row in sorted(clip_states) for frame in clip_states[row]]
+        if not clip:
+            return
+
+        all_frames = [frame for images in self.frames.values() for frame in images] + clip
+        canvas_w = max(frame.get_width() for frame in all_frames)
+        canvas_h = max(frame.get_height() for frame in all_frames)
+        canvas_size = (canvas_w, canvas_h)
+
+        for row, images in list(self.frames.items()):
+            self.frames[row] = [self._pad_frame(frame, canvas_size) for frame in images]
+        self.frames[state] = [self._pad_frame(frame, canvas_size) for frame in clip]
 
     def set_state(self, row_index):
         if self.current_row != row_index:
@@ -147,7 +206,8 @@ class Animator:
         if self.current_row in self.frames:
             num_frames = len(self.frames[self.current_row])
             if num_frames > 0:
-                self.current_frame += self.animation_speed * (dt_ms / (1000.0 / 60.0))
+                speed = self.state_speeds.get(self.current_row, self.animation_speed)
+                self.current_frame += speed * (dt_ms / (1000.0 / 60.0))
                 if self.current_frame >= num_frames:
                     self.current_frame %= num_frames
 

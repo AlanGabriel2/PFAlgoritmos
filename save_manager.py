@@ -14,7 +14,7 @@ DEFAULT_GLOBAL_SAVE = {
     "music_volume": 100,
     "resolution": [1280, 720],
     "fullscreen": True,
-    "aspect_mode": "fit",
+    "aspect_mode": "pixel_perfect",
     "fps_limit": 60,
     "tutorial_completed": False,
     "gamepad_rumble": True,

@@ -182,7 +182,7 @@ class DisclaimerScreen:
             scale_factor = 1.0 + 0.15 * abs(math.sin(self.time * 0.05))
             new_w = int(self.save_img.get_width() * scale_factor)
             new_h = int(self.save_img.get_height() * scale_factor)
-            scaled_img = pygame.transform.smoothscale(self.save_img, (new_w, new_h))
+            scaled_img = pygame.transform.scale(self.save_img, (new_w, new_h))
             img_rect = scaled_img.get_rect(center=(cx, cy))
             surface.blit(scaled_img, img_rect)
         else:
@@ -981,10 +981,11 @@ class OptionsMenu:
                 break
 
         self.aspect_modes = [
+            ("pixel_perfect", "Pixel perfecto (más nítido)"),
             ("fit", "Ver todo (con barras)"),
             ("fill", "Llenar pantalla (recorta)"),
         ]
-        saved_aspect = global_data.get("aspect_mode", "fit") if global_data else "fit"
+        saved_aspect = global_data.get("aspect_mode", "pixel_perfect") if global_data else "pixel_perfect"
         self.aspect_index = 0
         for i, (value, _) in enumerate(self.aspect_modes):
             if value == saved_aspect:

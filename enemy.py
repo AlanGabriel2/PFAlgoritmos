@@ -76,7 +76,12 @@ class Enemy:
         
         if frame_height is None:
             frame_height = frame_width
-        self.animator = Animator(sheet_path, int(frame_width * scale), int(frame_height * scale), rows, cols, 0.15)
+        self.animator = Animator(
+            sheet_path,
+            int(frame_width * scale), int(frame_height * scale),
+            rows, cols, 0.15,
+            state_speeds={0: 0.08, 1: 0.14, 2: 0.22},
+        )
         self.color = (255, 50, 50)
 
     def sync_rect_to_position(self):
@@ -206,12 +211,12 @@ class Enemy:
 class BugEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
         # Tamaño escalado un poco más pequeño
-        super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet.png", 54, cols=6, scale=scale, collision_scale=0.82)
+        super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet_normalized.png", 54, cols=6, scale=scale, collision_scale=0.82)
         self.ai_smartness = 0.9
         self.animator.animation_speed = 0.08
 class SpaghettiEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet.png", 72, scale=scale, collision_scale=0.70)
+        super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet_normalized.png", 72, scale=scale, collision_scale=0.70)
         self.ai_smartness = 0.55
         self.separation_weight = 0.45
     def move_logic(self, player_x, player_y):
@@ -223,13 +228,35 @@ class SpaghettiEnemy(Enemy):
 
 class MemoryLeakEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet.png", 48, scale=scale, collision_scale=0.82)
+        super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet_normalized.png", 48, scale=scale, collision_scale=0.82)
         self.ai_smartness = 0.95
 
 class DeadlineEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet.png", 96, scale=scale, collision_scale=0.56)
+        super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet_normalized.png", 96, scale=scale, collision_scale=0.56)
         self.ai_smartness = 0.85
+        self.animator.state_speeds = {0: 0.07, 1: 0.16, 2: 0.22}
+        self.animator.replace_state_from_sheet(
+            0,
+            "assets/images/enemies/generated/deadline_idle_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(96 * scale),
+        )
+        self.animator.replace_state_from_sheet(
+            1,
+            "assets/images/enemies/generated/deadline_walk_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(96 * scale),
+        )
+        self.animator.replace_state_from_sheet(
+            2,
+            "assets/images/enemies/generated/deadline_attack_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(96 * scale),
+        )
     def move_logic(self, player_x, player_y):
         dist = math.hypot(player_x - self.x, player_y - self.y)
         speed = 4.0 if dist < 150 else 1.0
@@ -253,11 +280,26 @@ class DeadlineEnemy(Enemy):
 
 class MiniBoss(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 90, 1.2, 150, "assets/images/enemies/miniboss_sheet.png", 192, scale=scale)
+        super().__init__(x, y, 90, 1.2, 150, "assets/images/enemies/miniboss_sheet_normalized.png", 192, scale=scale)
         self.ai_smartness = 0.75
         self.separation_weight = 0.25
         self.action_timer = 0
-        self.animator.animation_speed = 0.08 # Animacion un poco mas lenta
+        self.animator.animation_speed = 0.08
+        self.animator.state_speeds = {0: 0.07, 1: 0.16, 2: 0.25}
+        self.animator.replace_state_from_sheet(
+            1,
+            "assets/images/enemies/generated/miniboss_walk_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(192 * scale),
+        )
+        self.animator.replace_state_from_sheet(
+            2,
+            "assets/images/enemies/generated/miniboss_attack_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(192 * scale),
+        )
         self.jump_timer = 0
         self.jump_duration = 38
         self.jump_cooldown = 0
@@ -934,7 +976,7 @@ class MiniBoss(Enemy):
 
 class Boss(Enemy):
     def __init__(self, x, y, scale=1.0):
-        super().__init__(x, y, 105, 0.8, 500, "assets/images/enemies/boss_sheet.png", 288, cols=8, rows=4, scale=scale)
+        super().__init__(x, y, 105, 0.8, 500, "assets/images/enemies/boss_sheet_normalized.png", 288, cols=8, rows=4, scale=scale)
         self.ai_smartness = 0.7
         self.separation_weight = 0.2
         self.ignores_map_collision = True

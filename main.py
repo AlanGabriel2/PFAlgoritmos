@@ -323,7 +323,13 @@ def get_viewport_transform(target_size, aspect_mode="fit"):
     if target_w <= 0 or target_h <= 0:
         return 1.0, 0, 0, WIDTH, HEIGHT
 
-    if aspect_mode == "fill":
+    if aspect_mode == "pixel_perfect":
+        # La escala entera es la única que garantiza que cada píxel lógico ocupe
+        # exactamente N×N píxeles físicos. En ventanas menores al lienzo base se
+        # usa fit como salvaguarda para que la interfaz siga siendo utilizable.
+        fit_scale = min(target_w / WIDTH, target_h / HEIGHT)
+        scale = float(max(1, int(fit_scale))) if fit_scale >= 1.0 else fit_scale
+    elif aspect_mode == "fill":
         scale = max(target_w / WIDTH, target_h / HEIGHT)
     else:
         scale = min(target_w / WIDTH, target_h / HEIGHT)
@@ -631,8 +637,8 @@ def main():
     pause_menu = PauseMenu(WIDTH, HEIGHT, font_lg, font_md)
     options_menu = OptionsMenu(WIDTH, HEIGHT, font_lg, font_md, font_sm, global_data)
     aspect_mode = global_data.get("aspect_mode", "fit")
-    if aspect_mode not in ("fit", "fill"):
-        aspect_mode = "fit"
+    if aspect_mode not in ("pixel_perfect", "fit", "fill"):
+        aspect_mode = "pixel_perfect"
     fps_limit = sanitize_fps_limit(global_data.get("fps_limit", DEFAULT_FPS_LIMIT))
     previous_state = None
     options_return_state = "MAIN_MENU"
@@ -1798,7 +1804,7 @@ def main():
                 scale_factor = 1.0 + 0.15 * abs(math.sin(save_indicator_timer * 0.1))
                 new_w = int(SAVE_ICON_IMG.get_width() * scale_factor)
                 new_h = int(SAVE_ICON_IMG.get_height() * scale_factor)
-                scaled_img = pygame.transform.smoothscale(SAVE_ICON_IMG, (new_w, new_h))
+                scaled_img = pygame.transform.scale(SAVE_ICON_IMG, (new_w, new_h))
                 img_rect = scaled_img.get_rect(center=(icon_x, icon_y))
                 screen.blit(scaled_img, img_rect)
             else:
