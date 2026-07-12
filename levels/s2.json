@@ -84,9 +84,9 @@
         },
         {
             "x": 11,
-            "y": 898,
+            "y": 897,
             "w": 1672,
-            "h": 63,
+            "h": 64,
             "name": "bottom_wall",
             "type": "wall",
             "enabled": true
@@ -138,9 +138,9 @@
         },
         {
             "x": 35,
-            "y": 166,
+            "y": 158,
             "w": 58,
-            "h": 71,
+            "h": 79,
             "name": "left_wall_bookshelf",
             "type": "bookshelf",
             "enabled": true
@@ -155,17 +155,17 @@
             "enabled": true
         },
         {
-            "x": 603,
-            "y": 242,
+            "x": 601,
+            "y": 228,
             "w": 274,
-            "h": 50,
+            "h": 54,
             "name": "mid_center_bookshelf",
             "type": "bookshelf",
             "enabled": true
         },
         {
             "x": 1149,
-            "y": 231,
+            "y": 228,
             "w": 185,
             "h": 66,
             "name": "mid_right_bookshelf",
@@ -182,35 +182,35 @@
             "enabled": true
         },
         {
-            "x": 1153,
-            "y": 388,
+            "x": 1151,
+            "y": 375,
             "w": 175,
-            "h": 56,
+            "h": 63,
             "name": "lower_right_bookshelf",
             "type": "bookshelf",
             "enabled": true
         },
         {
             "x": 186,
-            "y": 720,
+            "y": 701,
             "w": 289,
-            "h": 53,
+            "h": 68,
             "name": "bottom_left_bookshelf",
             "type": "bookshelf",
             "enabled": true
         },
         {
             "x": 1259,
-            "y": 713,
+            "y": 700,
             "w": 224,
-            "h": 61,
+            "h": 72,
             "name": "bottom_right_bookshelf",
             "type": "bookshelf",
             "enabled": true
         },
         {
             "x": 40,
-            "y": 300,
+            "y": 293,
             "w": 197,
             "h": 71,
             "name": "small_left_reading_table",
@@ -227,26 +227,26 @@
             "enabled": true
         },
         {
-            "x": 1425,
-            "y": 306,
+            "x": 1424,
+            "y": 296,
             "w": 209,
-            "h": 61,
+            "h": 67,
             "name": "small_right_reading_table",
             "type": "table",
             "enabled": true
         },
         {
-            "x": 348,
-            "y": 416,
-            "w": 44,
-            "h": 137,
+            "x": 347,
+            "y": 413,
+            "w": 45,
+            "h": 140,
             "name": "new_24",
             "type": "solid",
             "enabled": true
         },
         {
             "x": 584,
-            "y": 398,
+            "y": 387,
             "w": 47,
             "h": 61,
             "name": "new_25",
@@ -254,19 +254,10 @@
             "enabled": true
         },
         {
-            "x": 433,
-            "y": 109,
+            "x": 956,
+            "y": 225,
             "w": 80,
-            "h": 59,
-            "name": "new_26",
-            "type": "solid",
-            "enabled": true
-        },
-        {
-            "x": 958,
-            "y": 240,
-            "w": 80,
-            "h": 57,
+            "h": 65,
             "name": "new_26",
             "type": "solid",
             "enabled": true
@@ -281,10 +272,10 @@
             "enabled": true
         },
         {
-            "x": 1501,
-            "y": 567,
+            "x": 1500,
+            "y": 557,
             "w": 134,
-            "h": 51,
+            "h": 55,
             "name": "new_28",
             "type": "solid",
             "enabled": true
@@ -354,9 +345,9 @@
         },
         {
             "x": 1100,
-            "y": 557,
+            "y": 548,
             "w": 227,
-            "h": 58,
+            "h": 65,
             "name": "new_36",
             "type": "solid",
             "enabled": true
@@ -408,18 +399,18 @@
         },
         {
             "x": 44,
-            "y": 565,
+            "y": 561,
             "w": 120,
-            "h": 63,
+            "h": 58,
             "name": "new_42",
             "type": "solid",
             "enabled": true
         },
         {
             "x": 37,
-            "y": 826,
-            "w": 82,
-            "h": 71,
+            "y": 816,
+            "w": 84,
+            "h": 81,
             "name": "new_43",
             "type": "solid",
             "enabled": true

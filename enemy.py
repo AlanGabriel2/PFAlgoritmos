@@ -68,6 +68,7 @@ class Enemy:
         self.bullets = []
         self.evasion_dir = random.choice([-1, 1])
         self.evasion_timer = 0
+        self.hit_flash = 0  # frames de flash blanco al recibir un balazo
         self.ai_smartness = 0.85
         self.separation_weight = 0.55
         self.navigator = EnemyNavigator()
@@ -158,6 +159,8 @@ class Enemy:
     def _update_cooldowns_and_bullets(self, width, height):
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
+        if self.hit_flash > 0:
+            self.hit_flash -= 1
 
         # Update bullets
         for b in self.bullets[:]:
@@ -188,6 +191,10 @@ class Enemy:
         dy = int(self.y + offset_y - visual_y_offset)
         
         if image:
+            if self.hit_flash > 0:
+                # Flash blanco sólido y breve: feedback de impacto al estilo pixel
+                image = image.copy()
+                image.fill((255, 255, 255), special_flags=pygame.BLEND_RGB_MAX)
             rect = image.get_rect(center=(dx, dy))
             surface.blit(image, rect)
         else:
@@ -213,12 +220,23 @@ class BugEnemy(Enemy):
         # Tamaño escalado un poco más pequeño
         super().__init__(x, y, 20, 3.0, 20, "assets/images/enemies/bug_sheet_normalized.png", 54, cols=6, scale=scale, collision_scale=0.82)
         self.ai_smartness = 0.9
-        self.animator.animation_speed = 0.08
+        self.animator.state_speeds = {0: 0.07, 1: 0.18, 2: 0.28}
+        for state, name in enumerate(("idle", "walk", "attack")):
+            self.animator.replace_state_from_sheet(
+                state, f"assets/images/enemies/generated/bug_{name}_v2_alpha_master_normalized.png",
+                rows=2, cols=4, frame_height=int(54 * scale),
+            )
 class SpaghettiEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
         super().__init__(x, y, 29, 1.5, 40, "assets/images/enemies/spaghetti_sheet_normalized.png", 72, scale=scale, collision_scale=0.70)
         self.ai_smartness = 0.55
         self.separation_weight = 0.45
+        self.animator.state_speeds = {0: 0.06, 1: 0.14, 2: 0.22}
+        for state, name in enumerate(("idle", "walk", "attack")):
+            self.animator.replace_state_from_sheet(
+                state, f"assets/images/enemies/generated/spaghetti_{name}_v2_alpha_master_normalized.png",
+                rows=2, cols=4, frame_height=int(72 * scale),
+            )
     def move_logic(self, player_x, player_y):
         # Erratic movement
         angle = math.atan2(player_y - self.y, player_x - self.x) + random.uniform(-0.5, 0.5)
@@ -230,9 +248,18 @@ class MemoryLeakEnemy(Enemy):
     def __init__(self, x, y, scale=1.0):
         super().__init__(x, y, 24, 2.0, 30, "assets/images/enemies/leak_sheet_normalized.png", 48, scale=scale, collision_scale=0.82)
         self.ai_smartness = 0.95
+        self.animator.state_speeds = {0: 0.06, 1: 0.13, 2: 0.20}
+        for state, name in enumerate(("idle", "walk", "attack")):
+            self.animator.replace_state_from_sheet(
+                state, f"assets/images/enemies/generated/leak_{name}_v2_alpha_master_normalized.png",
+                rows=2, cols=4, frame_height=int(48 * scale),
+            )
 
 class DeadlineEnemy(Enemy):
+    SCALE_FACTOR = 0.9  # ajuste visual sobre la escala del nivel
+
     def __init__(self, x, y, scale=1.0):
+        scale *= self.SCALE_FACTOR
         super().__init__(x, y, 36, 1.0, 25, "assets/images/enemies/deadline_sheet_normalized.png", 96, scale=scale, collision_scale=0.56)
         self.ai_smartness = 0.85
         self.animator.state_speeds = {0: 0.07, 1: 0.16, 2: 0.22}
@@ -279,13 +306,23 @@ class DeadlineEnemy(Enemy):
 # ---- Bosses ----
 
 class MiniBoss(Enemy):
+    SCALE_FACTOR = 1.15  # ajuste visual sobre la escala del nivel
+
     def __init__(self, x, y, scale=1.0):
+        scale *= self.SCALE_FACTOR
         super().__init__(x, y, 90, 1.2, 150, "assets/images/enemies/miniboss_sheet_normalized.png", 192, scale=scale)
         self.ai_smartness = 0.75
         self.separation_weight = 0.25
         self.action_timer = 0
         self.animator.animation_speed = 0.08
         self.animator.state_speeds = {0: 0.07, 1: 0.16, 2: 0.25}
+        self.animator.replace_state_from_sheet(
+            0,
+            "assets/images/enemies/generated/miniboss_idle_v2_alpha_master_normalized.png",
+            rows=2,
+            cols=4,
+            frame_height=int(192 * scale),
+        )
         self.animator.replace_state_from_sheet(
             1,
             "assets/images/enemies/generated/miniboss_walk_v2_alpha_master_normalized.png",
@@ -975,11 +1012,20 @@ class MiniBoss(Enemy):
             self.state = 0
 
 class Boss(Enemy):
+    SCALE_FACTOR = 1.15  # ajuste visual sobre la escala del nivel
+
     def __init__(self, x, y, scale=1.0):
+        scale *= self.SCALE_FACTOR
         super().__init__(x, y, 105, 0.8, 500, "assets/images/enemies/boss_sheet_normalized.png", 288, cols=8, rows=4, scale=scale)
         self.ai_smartness = 0.7
         self.separation_weight = 0.2
         self.ignores_map_collision = True
+        self.animator.state_speeds = {0: 0.06, 1: 0.12, 2: 0.25}
+        for state, name in enumerate(("idle", "walk", "attack")):
+            self.animator.replace_state_from_sheet(
+                state, f"assets/images/enemies/generated/boss_{name}_v2_alpha_master_normalized.png",
+                rows=2, cols=4, frame_height=int(288 * scale),
+            )
         self.action_timer = 0
         
 

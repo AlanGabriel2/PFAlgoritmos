@@ -1,7 +1,25 @@
 import json
 import os
+import tempfile
 
 SAVE_DIR = "saves"
+
+
+def _atomic_write_json(path, data):
+    """Escritura atómica: si el juego se cierra a media escritura, el archivo
+    anterior queda intacto (se escribe a un temporal y luego se reemplaza)."""
+    directory = os.path.dirname(path) or "."
+    fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
@@ -14,7 +32,7 @@ DEFAULT_GLOBAL_SAVE = {
     "music_volume": 100,
     "resolution": [1280, 720],
     "fullscreen": True,
-    "aspect_mode": "pixel_perfect",
+    "aspect_mode": "fit",
     "fps_limit": 60,
     "tutorial_completed": False,
     "gamepad_rumble": True,
@@ -60,8 +78,7 @@ def load_global_save():
     return merged
 
 def save_global_save(data):
-    with open(GLOBAL_SAVE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    _atomic_write_json(GLOBAL_SAVE, data)
 
 def get_slot_path(slot_index):
     return os.path.join(SAVE_DIR, f"slot_{slot_index}.json")
@@ -82,8 +99,7 @@ def save_game(slot_index, engine, semester_counter, energy, max_energy, camera_x
         "camera_y": camera_y,
         "nodes_state": engine.state
     }
-    with open(get_slot_path(slot_index), "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    _atomic_write_json(get_slot_path(slot_index), data)
 
 def load_game(slot_index):
     if has_save(slot_index):

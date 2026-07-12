@@ -156,45 +156,45 @@
         },
         {
             "x": 423,
-            "y": 314,
+            "y": 320,
             "w": 317,
-            "h": 127,
+            "h": 121,
             "name": "upper_left_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 933,
-            "y": 313,
+            "y": 318,
             "w": 320,
-            "h": 129,
+            "h": 124,
             "name": "upper_right_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 421,
-            "y": 537,
+            "y": 550,
             "w": 321,
-            "h": 130,
+            "h": 117,
             "name": "lower_left_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 930,
-            "y": 542,
+            "y": 551,
             "w": 319,
-            "h": 127,
+            "h": 118,
             "name": "lower_right_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 222,
-            "y": 777,
+            "y": 766,
             "w": 159,
-            "h": 89,
+            "h": 100,
             "name": "bottom_left_terminal",
             "type": "desk",
             "enabled": true
@@ -257,7 +257,7 @@
             "x": 37,
             "y": 344,
             "w": 61,
-            "h": 106,
+            "h": 92,
             "name": "new_25",
             "type": "solid",
             "enabled": true
@@ -344,8 +344,8 @@
             "enabled": true
         },
         {
-            "x": 267,
-            "y": 736,
+            "x": 265,
+            "y": 737,
             "w": 65,
             "h": 42,
             "name": "new_35",

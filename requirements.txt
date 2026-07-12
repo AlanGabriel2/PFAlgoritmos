@@ -1,0 +1,5 @@
+# Dependencia de ejecución del juego
+pygame-ce>=2.5,<3
+
+# Herramientas de desarrollo (tools/normalize_spritesheets.py)
+# Pillow>=10

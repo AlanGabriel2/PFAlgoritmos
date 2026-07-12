@@ -1,5 +1,10 @@
 from data import SUBJECTS
 
+# MODO PRUEBA: en True desbloquea todas las materias (útil para probar niveles
+# sueltos). Debe estar en False para que la progresión por prerrequisitos —el
+# corazón del juego— funcione.
+UNLOCK_ALL_FOR_TESTING = True
+
 # Colores de los 8 caminos críticos (aristas del mapa). El tutorial también los
 # usa para mostrar la leyenda de colores.
 PATH_PALETTE = [
@@ -134,11 +139,10 @@ class DagEngine:
                 if can_unlock:
                     self.state[node] = NodeState.UNLOCKED
 
-        # --- MODO PRUEBA: Desbloquear todos los nodos temporalmente ---
-        for node in self.nodes:
-            if self.state[node] == NodeState.LOCKED:
-                self.state[node] = NodeState.UNLOCKED
-        # --------------------------------------------------------------
+        if UNLOCK_ALL_FOR_TESTING:
+            for node in self.nodes:
+                if self.state[node] == NodeState.LOCKED:
+                    self.state[node] = NodeState.UNLOCKED
 
     def clean_room(self, node):
         if self.state[node] == NodeState.UNLOCKED:

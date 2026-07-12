@@ -89,6 +89,10 @@ class CollisionManager:
         if amount == 0:
             return False
 
+        # El rect puede ir desplazado respecto a (x, y) — p. ej. la hitbox del
+        # jugador anclada a los pies — asi que hay que respetar ese offset aqui.
+        offset_y = getattr(entity, "rect_offset_y", 0)
+
         if axis == "x":
             if hasattr(entity, "x"):
                 entity.x += amount
@@ -98,7 +102,7 @@ class CollisionManager:
         else:
             if hasattr(entity, "y"):
                 entity.y += amount
-                entity.rect.centery = int(round(entity.y))
+                entity.rect.centery = int(round(entity.y)) + offset_y
             else:
                 entity.rect.y += int(round(amount))
 
@@ -138,7 +142,7 @@ class CollisionManager:
                 else:
                     entity.rect.top = max(collider.bottom for collider in collisions)
             if hasattr(entity, "y"):
-                entity.y = float(entity.rect.centery)
+                entity.y = float(entity.rect.centery - offset_y)
 
         return True
 

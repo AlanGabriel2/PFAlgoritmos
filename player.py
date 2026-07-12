@@ -31,6 +31,7 @@ class Player:
         self.y = y
         self.radius = 30 * scale
         self.rect = pygame.Rect(0, 0, 51 * scale, 57 * scale)
+        self.rect_offset_y = 0  # se ajusta al cargar el animator
         self.sync_rect_to_position()
         self.last_collision = {"x": False, "y": False}
         self.speed = 5
@@ -41,6 +42,7 @@ class Player:
         self.color = (0, 255, 255)
         self.bullets = []
         self.shoot_cooldown = 0
+        self.invuln_timer = 0  # i-frames tras recibir daño (el sprite parpadea)
         self._move_residual_x = 0.0
         self._move_residual_y = 0.0
         
@@ -75,12 +77,21 @@ class Player:
         self.state = 0 # 0: Idle, 1: Walk, 2: Attack
         self.flip = False
 
+        # Ancla la hitbox a los pies y la estira hacia arriba hasta cubrir la
+        # cabeza (90% del frame; el resto es aire/pelo). Los frames van anclados
+        # al fondo del lienzo del animator y ese lienzo se dibuja centrado en (x, y).
+        frame = self.animator.get_current_image()
+        if frame:
+            self.rect.height = max(self.rect.height, int(round(frame.get_height() * 0.7)))
+            self.rect_offset_y = int(round(frame.get_height() / 2 - self.rect.height / 2))
+            self.sync_rect_to_position()
+
     def sync_rect_to_position(self):
-        self.rect.center = (int(round(self.x)), int(round(self.y)))
+        self.rect.center = (int(round(self.x)), int(round(self.y)) + self.rect_offset_y)
 
     def sync_position_to_rect(self):
         self.x = float(self.rect.centerx)
-        self.y = float(self.rect.centery)
+        self.y = float(self.rect.centery - self.rect_offset_y)
 
     def move(self, keys, width, height, collision_manager=None, input_vector=None):
         dx = 0
@@ -155,7 +166,21 @@ class Player:
             self.state = 2 # Attack
             audio.play_sfx("shoot")
 
+    def take_damage(self, amount):
+        """Aplica daño respetando los i-frames; devuelve True si el golpe conectó.
+
+        Los llamadores deben condicionar sonido/vibración/números flotantes a que
+        el golpe realmente haya conectado.
+        """
+        if self.invuln_timer > 0:
+            return False
+        self.hp -= amount
+        self.invuln_timer = 45  # 0.75 s: evita que varios enemigos drenen la vida en un frame
+        return True
+
     def update_bullets(self, width, height):
+        if self.invuln_timer > 0:
+            self.invuln_timer -= 1
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
             if self.shoot_cooldown == 0:
@@ -174,6 +199,10 @@ class Player:
         if image:
             if getattr(self, 'flip', False):
                 image = pygame.transform.flip(image, True, False)
+            if self.invuln_timer > 0 and (self.invuln_timer // 4) % 2 == 0:
+                # Parpadeo durante los i-frames: se dibuja semitransparente
+                image = image.copy()
+                image.set_alpha(80)
             rect = image.get_rect(center=(int(self.x + offset_x), int(self.y + offset_y)))
             surface.blit(image, rect)
         else:

@@ -637,8 +637,10 @@ def main():
     pause_menu = PauseMenu(WIDTH, HEIGHT, font_lg, font_md)
     options_menu = OptionsMenu(WIDTH, HEIGHT, font_lg, font_md, font_sm, global_data)
     aspect_mode = global_data.get("aspect_mode", "fit")
+    # 'fit' como default: en monitores 1080p el modo pixel-perfect cae a escala
+    # x1 (1280x720 centrado con bordes enormes), asi que se deja como opt-in.
     if aspect_mode not in ("pixel_perfect", "fit", "fill"):
-        aspect_mode = "pixel_perfect"
+        aspect_mode = "fit"
     fps_limit = sanitize_fps_limit(global_data.get("fps_limit", DEFAULT_FPS_LIMIT))
     previous_state = None
     options_return_state = "MAIN_MENU"
@@ -777,6 +779,59 @@ def main():
 
     floating_texts = [] # Lista para almacenar los números de daño flotantes
     player_hazard_cooldown = 0
+    death_effects = []  # esquirlas de píxeles de enemigos muriendo
+    combat_stats = {"damage": 0, "kills": 0, "start_ms": 0, "end_ms": 0}  # resumen post-combate
+    map_unlock_effects = []  # anillos de "materia desbloqueada" en el mapa
+
+    def capture_unlocks(states_before):
+        """Registra las materias recién desbloqueadas para celebrarlas en el mapa."""
+        newly = [n for n in engine.nodes
+                 if states_before.get(n) == NodeState.LOCKED and engine.state[n] == NodeState.UNLOCKED]
+        for n in newly:
+            map_unlock_effects.append({"node": n, "timer": 180, "max": 180})
+        if newly:
+            audio.play_sfx("unlock", "level_clear")
+
+    def recommended_node():
+        """Materia disponible que conviene jugar: prioriza las que pertenecen a un
+        camino crítico (no atrasarlas es lo que protege el Tiempo Récord) y entre
+        ellas la de cadena de prerrequisitos más larga."""
+        unlocked = [n for n in engine.nodes if engine.state[n] == NodeState.UNLOCKED]
+        if not unlocked:
+            return None
+        critical = [n for n in unlocked if n in engine.critical_nodes]
+        pool = critical or unlocked
+        return max(pool, key=lambda n: engine.dp.get(n, 0))
+
+    def spawn_death_effect(enemy):
+        """Rompe el sprite del enemigo en esquirlas de píxeles que salen despedidas.
+
+        Sin transparencias ni escalado suave: bloques del propio sprite que se
+        encogen hasta desaparecer, acorde al lenguaje pixel del juego.
+        """
+        image = enemy.animator.get_current_image()
+        if not image:
+            return
+        w, h = image.get_size()
+        block = max(6, min(w, h) // 8)  # ~8x8 esquirlas por lado, mínimo 6px
+        for by in range(0, h, block):
+            for bx in range(0, w, block):
+                rect = pygame.Rect(bx, by, min(block, w - bx), min(block, h - by))
+                piece = image.subsurface(rect)
+                if piece.get_bounding_rect(min_alpha=20).width == 0:
+                    continue  # esquirla vacía (fuera de la silueta)
+                px = enemy.x - w / 2 + bx + rect.w / 2
+                py = enemy.y - h / 2 + by + rect.h / 2
+                angle = math.atan2(py - enemy.y, px - enemy.x) + random.uniform(-0.6, 0.6)
+                speed = random.uniform(1.2, 3.4)
+                life = random.randint(14, 26)
+                death_effects.append({
+                    "piece": piece.copy(),
+                    "x": px, "y": py,
+                    "vx": math.cos(angle) * speed,
+                    "vy": math.sin(angle) * speed,
+                    "life": life, "max": life,
+                })
 
     trans_state = {
         "active": False,
@@ -926,7 +981,9 @@ def main():
             return
 
         damage = strongest_hit["damage"]
-        combat_player.hp -= damage
+        if not combat_player.take_damage(damage):
+            return
+        combat_stats["damage"] += damage
         audio.play_sfx("hurt")
         gamepad.rumble()
         player_hazard_cooldown = positive_int(
@@ -982,6 +1039,11 @@ def main():
         level_failed_timer = 0
         level_failed_done = False
         player_hazard_cooldown = 0
+        death_effects.clear()
+        combat_stats["damage"] = 0
+        combat_stats["kills"] = 0
+        combat_stats["start_ms"] = pygame.time.get_ticks()
+        combat_stats["end_ms"] = 0
 
         world_w, world_h = combat_world_size()
         scale = current_level.character_scale if current_level else 1.0
@@ -1254,7 +1316,9 @@ def main():
                     if event.key == pygame.K_r or event.key == pygame.K_SPACE: # Descansar / Avanzar Semestre
                         energy = max_energy
                         semester_counter += 1
+                        states_before = dict(engine.state)
                         engine.update_unlocks()
+                        capture_unlocks(states_before)
                         rest_animation_timer = 90 # 1.5 seconds animation
 
                     elif event.key == pygame.K_RETURN: # Entrar con Enter
@@ -1390,29 +1454,34 @@ def main():
                         elif isinstance(enemy, Boss):
                             bestiary_menu.unlock("MEGA BOSS (TITULACIÓN)")
 
-                        # El jugador recibe daño por contacto
+                        # El jugador recibe daño por contacto (si no está en i-frames)
                         if enemy.collides_with_player(combat_player) and enemy.attack_cooldown == 0:
-                            combat_player.hp -= 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
-                            enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
-                            audio.play_sfx("hurt")
-                            if isinstance(enemy, (MiniBoss, Boss)):
-                                gamepad.rumble(0.7, 1.0, 220)  # golpe de jefe: vibración fuerte
-                            else:
-                                gamepad.rumble()
+                            contact_damage = 20 if isinstance(enemy, (MiniBoss, Boss)) else 10
+                            if combat_player.take_damage(contact_damage):
+                                enemy.attack_cooldown = 45 if isinstance(enemy, (MiniBoss, Boss)) else 30
+                                combat_stats["damage"] += contact_damage
+                                audio.play_sfx("hurt")
+                                if isinstance(enemy, (MiniBoss, Boss)):
+                                    gamepad.rumble(0.7, 1.0, 220)  # golpe de jefe: vibración fuerte
+                                else:
+                                    gamepad.rumble()
 
                         # El jugador recibe daño por balas enemigas
                         for b in enemy.bullets[:]:
                             dist = math.hypot(combat_player.x - b.x, combat_player.y - b.y)
                             if dist < (combat_player.radius + b.radius):
-                                combat_player.hp -= 15
-                                audio.play_sfx("hurt")
-                                gamepad.rumble()
+                                if combat_player.take_damage(15):
+                                    combat_stats["damage"] += 15
+                                    audio.play_sfx("hurt")
+                                    gamepad.rumble()
                                 if b in enemy.bullets:
                                     enemy.bullets.remove(b)
 
                         if hasattr(enemy, "collect_area_damage_events"):
                             for hit in enemy.collect_area_damage_events(combat_player):
-                                combat_player.hp -= hit["damage"]
+                                if not combat_player.take_damage(hit["damage"]):
+                                    continue
+                                combat_stats["damage"] += hit["damage"]
                                 audio.play_sfx("hurt")
                                 gamepad.rumble()
                                 floating_texts.append({
@@ -1429,6 +1498,7 @@ def main():
                             if e.collides_with_bullet(b):
                                 damage = 10
                                 e.hp -= damage
+                                e.hit_flash = 4
                                 audio.play_sfx("hit")
 
                                 # Generar texto flotante de daño
@@ -1444,7 +1514,19 @@ def main():
                                     combat_player.bullets.remove(b)
                                 if e.hp <= 0:
                                     enemies.remove(e)
+                                    combat_stats["kills"] += 1
+                                    spawn_death_effect(e)
                                     audio.play_sfx(*enemy_die_sfx_names(e))
+
+                    # Esquirlas de muerte: vuelan, frenan y desaparecen
+                    for fx in death_effects[:]:
+                        fx["x"] += fx["vx"]
+                        fx["y"] += fx["vy"]
+                        fx["vx"] *= 0.90
+                        fx["vy"] *= 0.90
+                        fx["life"] -= 1
+                        if fx["life"] <= 0:
+                            death_effects.remove(fx)
 
                     # Actualizar textos flotantes
                     for ft in floating_texts[:]:
@@ -1475,7 +1557,8 @@ def main():
                     # Revisar si la habitación está limpia (solo si ya estamos en la última ronda)
                     if current_wave == max_waves and not enemies:
                         if level_passed_timer == 0 and not level_passed_done:
-                            level_passed_timer = 120 # 2 segundos
+                            level_passed_timer = 210 # 3.5 s: da tiempo de leer el resumen
+                            combat_stats["end_ms"] = pygame.time.get_ticks()  # congelar el cronómetro
                             audio.play_sfx("level_clear")
                             gamepad.rumble(0.2, 0.4, 150)  # confirmación suave
 
@@ -1483,8 +1566,10 @@ def main():
                             level_passed_timer -= 1
                             if level_passed_timer == 0:
                                 level_passed_done = True
+                                states_before = dict(engine.state)
                                 engine.clean_room(current_room)
                                 engine.update_unlocks()
+                                capture_unlocks(states_before)
 
                                 # AUTOSAVE
                                 save_mgr.save_game(current_slot, engine, semester_counter, energy, max_energy, camera_x, camera_y)
@@ -1507,6 +1592,10 @@ def main():
                 rest_animation_timer -= 1
             if map_message_timer > 0:
                 map_message_timer -= 1
+            for fx in map_unlock_effects[:]:
+                fx["timer"] -= 1
+                if fx["timer"] <= 0:
+                    map_unlock_effects.remove(fx)
             if save_indicator_timer > 0:
                 save_indicator_timer -= 1
             if gamepad_status_timer > 0:
@@ -1545,6 +1634,40 @@ def main():
             screen.blit(get_map_overlay(), (0, 0))
 
             map_gen.draw(screen, font_sm, camera_x, camera_y)
+
+            # Anillos de "materia desbloqueada": celebran los nuevos desbloqueos
+            for fx in map_unlock_effects:
+                room = map_gen.rooms.get(fx["node"])
+                if not room:
+                    continue
+                cx = room.rect.centerx + camera_x
+                cy = room.rect.centery + camera_y
+                t = 1.0 - fx["timer"] / fx["max"]
+                alpha = int(220 * (fx["timer"] / fx["max"]))
+                radius = int(max(room.rect.w, room.rect.h) * 0.55 + t * 46)
+                ring = pygame.Surface((radius * 2 + 8, radius * 2 + 8), pygame.SRCALPHA)
+                pygame.draw.circle(ring, (140, 235, 160, alpha), (radius + 4, radius + 4), radius, 4)
+                screen.blit(ring, (cx - radius - 4, cy - radius - 4))
+                if fx["timer"] > fx["max"] - 130:
+                    lbl = font_sm.render("¡DESBLOQUEADA!", False, (150, 255, 170))
+                    lbl.set_alpha(alpha)
+                    screen.blit(lbl, lbl.get_rect(center=(cx, room.rect.top + camera_y - 18)))
+
+            # Marcador del objetivo recomendado (materia disponible con la cadena
+            # más larga: seguirla mantiene al jugador sobre el camino crítico)
+            rec = recommended_node()
+            if rec and rec in map_gen.rooms:
+                r_rect = map_gen.rooms[rec].rect
+                rx = r_rect.centerx + camera_x
+                bob = int(4 * math.sin(pygame.time.get_ticks() / 180.0))
+                tip_y = r_rect.top + camera_y - 12 + bob
+                rec_color = (120, 230, 160)
+                pygame.draw.polygon(screen, (12, 10, 18),
+                                    [(rx - 12, tip_y - 18), (rx + 12, tip_y - 18), (rx, tip_y + 2)])
+                pygame.draw.polygon(screen, rec_color,
+                                    [(rx - 9, tip_y - 16), (rx + 9, tip_y - 16), (rx, tip_y - 1)])
+                rec_lbl = font_sm.render("RECOMENDADA", False, rec_color)
+                screen.blit(rec_lbl, rec_lbl.get_rect(center=(rx, tip_y - 30)))
 
             if selected_node and selected_node in map_gen.rooms:
                 sel_rect = map_gen.rooms[selected_node].rect.copy()
@@ -1597,6 +1720,14 @@ def main():
             for e in enemies:
                 e.draw(screen, combat_cam_x, combat_cam_y)
 
+            # Esquirlas de muerte: bloques del sprite que se encogen al volar
+            for fx in death_effects:
+                f = fx["life"] / fx["max"]
+                pw = max(1, int(fx["piece"].get_width() * f))
+                ph = max(1, int(fx["piece"].get_height() * f))
+                piece = pygame.transform.scale(fx["piece"], (pw, ph))
+                screen.blit(piece, (int(fx["x"] + combat_cam_x - pw / 2), int(fx["y"] + combat_cam_y - ph / 2)))
+
             # Dibujar textos flotantes de daño
             for ft in floating_texts:
                 alpha = min(255, int((ft["life"] / 40.0) * 255))
@@ -1604,6 +1735,35 @@ def main():
                 dmg_surf.set_alpha(alpha)
                 rect = dmg_surf.get_rect(center=(int(ft["x"] + combat_cam_x), int(ft["y"] + combat_cam_y)))
                 screen.blit(dmg_surf, rect)
+
+            # Resumen post-combate mientras corre la pausa de sala superada
+            if level_passed_timer > 0 and not editor_mode:
+                panel = pygame.Rect(0, 0, 560, 240)
+                panel.center = (WIDTH // 2, HEIGHT // 2 - 20)
+                bg = pygame.Surface(panel.size, pygame.SRCALPHA)
+                bg.fill((12, 10, 20, 225))
+                screen.blit(bg, panel.topleft)
+                pygame.draw.rect(screen, (36, 30, 54), panel, 4)
+                pygame.draw.rect(screen, (86, 74, 122), panel, 2)
+
+                title = font_lg.render("¡MATERIA APROBADA!", True, (150, 255, 150))
+                screen.blit(title, title.get_rect(center=(panel.centerx, panel.top + 46)))
+
+                subject_name = engine.subjects.get(current_room, {}).get("name", "")
+                if subject_name:
+                    name_surf = font_md.render(subject_name, True, (255, 216, 110))
+                    screen.blit(name_surf, name_surf.get_rect(center=(panel.centerx, panel.top + 92)))
+
+                end_ms = combat_stats["end_ms"] or pygame.time.get_ticks()
+                elapsed_s = max(0, (end_ms - combat_stats["start_ms"]) // 1000)
+                stats_lines = [
+                    f"Tiempo: {elapsed_s // 60}:{elapsed_s % 60:02d}",
+                    f"Daño recibido: {combat_stats['damage']}",
+                    f"Enemigos eliminados: {combat_stats['kills']}",
+                ]
+                for i, line in enumerate(stats_lines):
+                    surf = font_md.render(line, True, (220, 220, 230))
+                    screen.blit(surf, surf.get_rect(center=(panel.centerx, panel.top + 136 + i * 34)))
 
             if debug_enemy_paths and pathfinder:
                 draw_enemy_ai_debug(
@@ -1730,13 +1890,7 @@ def main():
             room_ts = render_text_fit(font_md, title, title_color, room_ts_max_w, antialias=False)
             room_x = max(life_right + 20, ui_right - room_ts.get_width() - 20)
             screen.blit(room_ts, (room_x, ui_top + 15))
-            if current_wave == max_waves and not enemies and level_passed_timer > 0:
-                msg_surf = font_lg.render("¡NIVEL SUPERADO!", True, (100, 255, 100))
-                msg_rect = msg_surf.get_rect(center=(WIDTH // 2, HEIGHT // 3))
-                # Text shadow
-                shadow_surf = font_lg.render("¡NIVEL SUPERADO!", True, (0, 50, 0))
-                screen.blit(shadow_surf, (msg_rect.x + 3, msg_rect.y + 3))
-                screen.blit(msg_surf, msg_rect)
+            # (el aviso "¡NIVEL SUPERADO!" fue reemplazado por el panel de resumen)
 
             if level_failed_timer > 0:
                 draw_defeat_sequence(screen, combat_player, combat_cam_x, combat_cam_y, level_failed_timer, DEFEAT_SEQUENCE_FRAMES)

@@ -140,7 +140,7 @@
             "x": 214,
             "y": 156,
             "w": 144,
-            "h": 72,
+            "h": 90,
             "name": "top_left_wall_terminal",
             "type": "console",
             "enabled": true
@@ -156,72 +156,72 @@
         },
         {
             "x": 423,
-            "y": 334,
+            "y": 320,
             "w": 317,
-            "h": 72,
+            "h": 121,
             "name": "upper_left_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
-            "x": 934,
-            "y": 326,
-            "w": 309,
-            "h": 89,
+            "x": 933,
+            "y": 318,
+            "w": 320,
+            "h": 124,
             "name": "upper_right_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
-            "x": 422,
-            "y": 572,
+            "x": 421,
+            "y": 550,
             "w": 321,
-            "h": 74,
+            "h": 117,
             "name": "lower_left_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 930,
-            "y": 577,
+            "y": 551,
             "w": 319,
-            "h": 78,
+            "h": 118,
             "name": "lower_right_computer_island",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 222,
-            "y": 766,
+            "y": 777,
             "w": 159,
-            "h": 100,
+            "h": 89,
             "name": "bottom_left_terminal",
             "type": "desk",
             "enabled": true
         },
         {
-            "x": 1280,
-            "y": 760,
+            "x": 1279,
+            "y": 770,
             "w": 150,
-            "h": 90,
+            "h": 80,
             "name": "bottom_right_terminal",
             "type": "desk",
             "enabled": true
         },
         {
             "x": 767,
-            "y": 777,
+            "y": 765,
             "w": 26,
-            "h": 107,
+            "h": 119,
             "name": "bottom_center_crates",
             "type": "crate",
             "enabled": true
         },
         {
             "x": 880,
-            "y": 785,
+            "y": 766,
             "w": 24,
-            "h": 95,
+            "h": 114,
             "name": "bottom_center_barrel",
             "type": "barrel",
             "enabled": true
@@ -246,9 +246,9 @@
         },
         {
             "x": 37,
-            "y": 523,
+            "y": 497,
             "w": 61,
-            "h": 84,
+            "h": 110,
             "name": "new_24",
             "type": "solid",
             "enabled": true
@@ -257,7 +257,7 @@
             "x": 37,
             "y": 344,
             "w": 61,
-            "h": 106,
+            "h": 92,
             "name": "new_25",
             "type": "solid",
             "enabled": true
@@ -302,7 +302,7 @@
             "x": 1572,
             "y": 342,
             "w": 63,
-            "h": 124,
+            "h": 120,
             "name": "new_30",
             "type": "solid",
             "enabled": true
@@ -311,16 +311,16 @@
             "x": 1571,
             "y": 497,
             "w": 66,
-            "h": 128,
+            "h": 126,
             "name": "new_31",
             "type": "solid",
             "enabled": true
         },
         {
             "x": 1530,
-            "y": 685,
+            "y": 673,
             "w": 43,
-            "h": 43,
+            "h": 55,
             "name": "new_32",
             "type": "solid",
             "enabled": true
@@ -346,7 +346,7 @@
         {
             "x": 267,
             "y": 736,
-            "w": 64,
+            "w": 65,
             "h": 42,
             "name": "new_35",
             "type": "solid",
@@ -365,17 +365,26 @@
             "x": 1587,
             "y": 180,
             "w": 75,
-            "h": 89,
+            "h": 103,
             "name": "new_37",
             "type": "solid",
             "enabled": true
         },
         {
             "x": 1588,
-            "y": 694,
+            "y": 671,
             "w": 66,
             "h": 23,
             "name": "new_38",
+            "type": "solid",
+            "enabled": true
+        },
+        {
+            "x": 1328,
+            "y": 735,
+            "w": 61,
+            "h": 61,
+            "name": "new_39",
             "type": "solid",
             "enabled": true
         }
@@ -385,5 +394,5 @@
     "interactables": [],
     "doors": [],
     "walkable_zones": [],
-    "pathfinding_cell_size": 48
+    "pathfinding_cell_size": 24
 }

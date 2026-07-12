@@ -111,6 +111,8 @@ def render_3d_gradient_text(text, font):
     return final_surf
 
 def scale_to_cover(image, target_w, target_h):
+    # smoothscale es intencional: esto escala FONDOS pintados (portada, opciones),
+    # no pixel art. Para sprites/iconos pixelados usar siempre scale/scale_by.
     img_w, img_h = image.get_size()
     scale = max(target_w / img_w, target_h / img_h)
     new_w = int(img_w * scale)
@@ -981,11 +983,11 @@ class OptionsMenu:
                 break
 
         self.aspect_modes = [
-            ("pixel_perfect", "Pixel perfecto (más nítido)"),
             ("fit", "Ver todo (con barras)"),
             ("fill", "Llenar pantalla (recorta)"),
+            ("pixel_perfect", "Pixel perfecto (escala entera)"),
         ]
-        saved_aspect = global_data.get("aspect_mode", "pixel_perfect") if global_data else "pixel_perfect"
+        saved_aspect = global_data.get("aspect_mode", "fit") if global_data else "fit"
         self.aspect_index = 0
         for i, (value, _) in enumerate(self.aspect_modes):
             if value == saved_aspect:

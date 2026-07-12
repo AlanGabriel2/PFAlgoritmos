@@ -306,6 +306,7 @@ class TutorialState:
                     if self.dummy_target and self.dummy_target.collides_with_bullet(b):
                         self.player.bullets.remove(b)
                         self.dummy_target.hp -= 10
+                        self.dummy_target.hit_flash = 8
                         if self.dummy_target.hp <= 0:
                             self.dummy_target = None
                             self.victory_timer = 90
