@@ -1,7 +1,7 @@
 import pygame
 import math
 import gamepad
-from menu import draw_energy_crystal, render_3d_gradient_text
+from menu import draw_energy_crystal, render_3d_gradient_text, safe_edges
 from dag_engine import PATH_PALETTE
 from player import Player
 from enemy import BugEnemy
@@ -263,7 +263,11 @@ class TutorialState:
             if self.victory_timer > 0:
                 self.victory_timer -= 1
                 if self.player:
-                    self.player.update_bullets(self.practice_level.width, self.practice_level.height)
+                    self.player.update_bullets(
+                        self.practice_level.width,
+                        self.practice_level.height,
+                        self.collision_manager,
+                    )
                 if self.victory_timer == 0:
                     self.phase = TutorialPhase.TEXT_ENEMIES
                     self.player = None
@@ -273,7 +277,7 @@ class TutorialState:
             world_w, world_h = self.practice_level.width, self.practice_level.height
             move_vector = gamepad.get_move_vector() if gamepad and gamepad.connected else None
             self.player.move(keys, world_w, world_h, self.collision_manager, move_vector)
-            self.player.update_bullets(world_w, world_h)
+            self.player.update_bullets(world_w, world_h, self.collision_manager)
             self._update_camera()
 
             # Disparo continuo con el ratón (coordenadas de pantalla -> mundo via cámara)
@@ -532,7 +536,8 @@ class TutorialState:
 
         # vida del jugador (abajo a la izquierda)
         if self.player:
-            bar = pygame.Rect(64, self.height - 46, 200, 18)
+            s_left, _, _, s_bottom = safe_edges(self)
+            bar = pygame.Rect(s_left + 64, s_bottom - 46, 200, 18)
             frac = max(0.0, self.player.hp / self.player.max_hp)
             pygame.draw.rect(surface, (12, 10, 18), bar.inflate(6, 6))
             pygame.draw.rect(surface, (60, 24, 30), bar)

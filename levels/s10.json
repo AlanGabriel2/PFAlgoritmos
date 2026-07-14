@@ -6,6 +6,7 @@
         941
     ],
     "coordinate_system": "world coordinates in source background pixels",
+    "projectiles_collide_with_solids": false,
     "player_spawn": [
         836,
         575

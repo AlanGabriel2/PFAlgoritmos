@@ -3,7 +3,7 @@ from data import SUBJECTS
 # MODO PRUEBA: en True desbloquea todas las materias (útil para probar niveles
 # sueltos). Debe estar en False para que la progresión por prerrequisitos —el
 # corazón del juego— funcione.
-UNLOCK_ALL_FOR_TESTING = True
+UNLOCK_ALL_FOR_TESTING = False
 
 # Colores de los 8 caminos críticos (aristas del mapa). El tutorial también los
 # usa para mostrar la leyenda de colores.

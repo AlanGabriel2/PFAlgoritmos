@@ -20,8 +20,8 @@ SHEETS = {
         2, 4, (160, 144), 112,
     ),
     "player_walk": (
-        "assets/images/player/generated/player_walk_v3_alpha_master.png",
-        2, 4, (160, 144), 112,
+        "assets/images/player/generated/player_walk_v6_alpha_master.png",
+        1, 6, (160, 144), 112,
     ),
     "player_attack": (
         "assets/images/player/generated/player_attack_v2_alpha_master.png",

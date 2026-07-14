@@ -8,7 +8,8 @@ import math
 import pygame
 import pytest
 
-from player import Player, ATTACK_IMPACT_FRAME
+from player import Player, ATTACK_IMPACT_FRAME, WALK_ANIMATION_SPEED
+from collision_manager import CollisionManager
 
 TICK = 1000.0 / 60.0
 W, H = 800, 600
@@ -88,6 +89,30 @@ def test_al_terminar_el_ataque_vuelve_al_base(player):
 def test_sin_moverse_el_base_es_idle(player):
     player.move_vector(0, 0, W, H)
     assert player.controller.current == "idle"
+
+
+def test_caminar_tiene_un_ritmo_legible(player):
+    player.move_vector(1, 0, W, H)
+    player.controller.update(dt_ms=TICK)
+    assert player.animator.current_frame == pytest.approx(WALK_ANIMATION_SPEED)
+
+
+def test_bala_choca_con_solido_delgado_sin_atravesarlo(player):
+    player.shoot_angle(0.0)
+    step_until_bullet(player)
+    bullet = player.bullets[0]
+    bullet.x = 100
+    bullet.y = 200
+    bullet.dx = 40
+    bullet.dy = 0
+    collision_manager = CollisionManager([pygame.Rect(120, 150, 2, 100)])
+
+    impacts = player.update_bullets(W, H, collision_manager)
+
+    assert player.bullets == []
+    assert len(impacts) == 1
+    assert impacts[0]["collider"] == pygame.Rect(120, 150, 2, 100)
+    assert impacts[0]["x"] < 120
 
 
 def test_draw_no_falla_y_usa_el_controller(player):

@@ -1,5 +1,23 @@
 import pygame
 import sys
+import os
+
+# En la version compilada, todas las rutas relativas deben partir de la carpeta
+# que contiene el .exe aunque se abra desde un acceso directo u otro directorio.
+if getattr(sys, "frozen", False):
+    os.chdir(os.path.dirname(sys.executable))
+
+# Windows agrupa las ventanas en la barra de tareas por AppUserModelID. Definir
+# uno propio evita que SDL/Pygame herede una identidad e icono genericos.
+if sys.platform == "win32":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "MegaCalabozoDAG.Game.1"
+        )
+    except (AttributeError, OSError):
+        pass
+
 import random
 import save_manager
 import math
@@ -21,6 +39,13 @@ import audio
 # Buffer estable para musica en streaming y efectos con baja latencia.
 pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.init()
+
+# Icono de la ventana (titulo, Alt+Tab y barra de tareas). El icono incrustado
+# por PyInstaller cubre el Explorador; SDL necesita recibirlo por separado.
+try:
+    pygame.display.set_icon(pygame.image.load("assets/images/ui/game_icon.png"))
+except (pygame.error, FileNotFoundError) as e:
+    print("No se pudo cargar el icono de la ventana:", e)
 
 # Configurar Pantalla
 WIDTH, HEIGHT = 1280, 720
@@ -587,7 +612,7 @@ def draw_selection_highlight(surface, rect):
         pygame.draw.line(surface, accent, (cx, cy), (cx, cy + sy * L), w)
 
 
-def draw_subject_tooltip(surface, engine, selected_node, sel_rect):
+def draw_subject_tooltip(surface, engine, selected_node, sel_rect, view=None):
     """Panel informativo de la materia (misma info y misma logica de posicion/volteo)."""
     name = engine.subjects[selected_node]['name']
     reqs = engine.subjects[selected_node]['reqs']
@@ -615,13 +640,17 @@ def draw_subject_tooltip(surface, engine, selected_node, sel_rect):
     tt_w = max_w + pad * 2
     tt_h = title_h + 6 + len(body) * line_h + pad
 
+    # En modo fill el área visible puede ser menor que el lienzo virtual.
+    if view is None:
+        view = pygame.Rect(0, 0, WIDTH, HEIGHT)
+
     # Misma logica que antes: al lado derecho del nodo y se voltea si no cabe.
     tt_x = sel_rect.right + 15
     tt_y = sel_rect.top
-    if tt_x + tt_w > WIDTH:
+    if tt_x + tt_w > view.right:
         tt_x = sel_rect.left - tt_w - 15
-    tt_x = max(8, tt_x)
-    tt_y = max(8, min(tt_y, HEIGHT - 8 - tt_h))
+    tt_x = max(view.left + 8, tt_x)
+    tt_y = max(view.top + 8, min(tt_y, view.bottom - 8 - tt_h))
 
     draw_pixel_panel(surface, (tt_x, tt_y, tt_w, tt_h), title_h=title_h, accent=MAP_UI["accent"])
     surface.blit(title_surf, (tt_x + pad, tt_y + 6))
@@ -849,6 +878,7 @@ def main():
     floating_texts = [] # Lista para almacenar los números de daño flotantes
     player_hazard_cooldown = 0
     death_effects = []  # esquirlas de píxeles de enemigos muriendo
+    bullet_impacts = []  # chispas de proyectiles contra objetos sólidos
     combat_stats = {"damage": 0, "kills": 0, "start_ms": 0, "end_ms": 0}  # resumen post-combate
     map_unlock_effects = []  # anillos de "materia desbloqueada" en el mapa
     win_selected = 0
@@ -916,6 +946,24 @@ def main():
                     "vy": math.sin(angle) * speed,
                     "life": life, "max": life,
                 })
+
+    def spawn_bullet_impact(impact):
+        """Crea un abanico breve de chispas en dirección contraria al disparo."""
+        reverse_angle = math.atan2(-impact["dy"], -impact["dx"])
+        for _ in range(random.randint(5, 8)):
+            angle = reverse_angle + random.uniform(-1.15, 1.15)
+            speed = random.uniform(1.5, 4.0)
+            life = random.randint(8, 16)
+            bullet_impacts.append({
+                "x": impact["x"],
+                "y": impact["y"],
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed,
+                "life": life,
+                "max": life,
+                "size": random.randint(2, 4),
+                "color": random.choice(((80, 255, 255), (0, 210, 230), (220, 255, 255))),
+            })
 
     trans_state = {
         "active": False,
@@ -1132,6 +1180,7 @@ def main():
         screen_shake_duration = 0
         screen_shake_magnitude = 0.0
         death_effects.clear()
+        bullet_impacts.clear()
         combat_stats["damage"] = 0
         combat_stats["kills"] = 0
         combat_stats["start_ms"] = pygame.time.get_ticks()
@@ -1581,7 +1630,13 @@ def main():
                         combat_player.shoot_angle(math.atan2((mouse_y - combat_cam_y) - combat_player.y, (mouse_x - combat_cam_x) - combat_player.x))
 
                     combat_player.move(keys, world_w, world_h, collision_manager, gamepad.get_move_vector())
-                    combat_player.update_bullets(world_w, world_h)
+                    projectile_collisions = (
+                        collision_manager
+                        if current_level.projectiles_collide_with_solids
+                        else None
+                    )
+                    for impact in combat_player.update_bullets(world_w, world_h, projectile_collisions):
+                        spawn_bullet_impact(impact)
                     apply_player_hazard_damage()
 
                     update_combat_camera(smooth=True)
@@ -1686,6 +1741,16 @@ def main():
                         fx["life"] -= 1
                         if fx["life"] <= 0:
                             death_effects.remove(fx)
+
+                    # Chispas de impacto: avanzan, frenan y se apagan rápidamente.
+                    for spark in bullet_impacts[:]:
+                        spark["x"] += spark["vx"]
+                        spark["y"] += spark["vy"]
+                        spark["vx"] *= 0.85
+                        spark["vy"] *= 0.85
+                        spark["life"] -= 1
+                        if spark["life"] <= 0:
+                            bullet_impacts.remove(spark)
 
                     # Actualizar textos flotantes
                     for ft in floating_texts[:]:
@@ -1833,7 +1898,8 @@ def main():
                 sel_rect.x += camera_x
                 sel_rect.y += camera_y
                 draw_selection_highlight(screen, sel_rect)
-                draw_subject_tooltip(screen, engine, selected_node, sel_rect)
+                draw_subject_tooltip(screen, engine, selected_node, sel_rect,
+                                     view=get_visible_virtual_rect(real_screen.get_size(), aspect_mode))
 
             # HUD superior del mapa (panel pixel-art con cristales de energia).
             # Se ancla al área visible para no recortarse en modo 'fill'.
@@ -1873,7 +1939,7 @@ def main():
         elif game_state == "COMBAT" or (game_state == "PAUSE" and previous_state == "COMBAT"):
             shake_x = shake_y = 0
             if screen_shake_timer > 0 and screen_shake_duration > 0:
-                decay = screen_shake_timer / screen_shake_duration
+                decay = screen_shake_timer / max(1, screen_shake_duration)
                 magnitude = screen_shake_magnitude * decay
                 shake_x = int(round(math.sin(screen_shake_timer * 2.37) * magnitude))
                 shake_y = int(round(math.cos(screen_shake_timer * 3.11) * magnitude))
@@ -1906,6 +1972,18 @@ def main():
                 piece = pygame.transform.scale(fx["piece"], (pw, ph))
                 screen.blit(piece, (int(fx["x"] + render_combat_cam_x - pw / 2), int(fx["y"] + render_combat_cam_y - ph / 2)))
 
+            # Chispas pixel-art de las balas al golpear paredes y máquinas.
+            for spark in bullet_impacts:
+                fade = spark["life"] / spark["max"]
+                size = max(1, int(spark["size"] * fade))
+                color = tuple(int(channel * fade) for channel in spark["color"])
+                spark_rect = pygame.Rect(0, 0, size, size)
+                spark_rect.center = (
+                    int(spark["x"] + render_combat_cam_x),
+                    int(spark["y"] + render_combat_cam_y),
+                )
+                pygame.draw.rect(screen, color, spark_rect)
+
             # Dibujar textos flotantes de daño
             for ft in floating_texts:
                 alpha = min(255, int((ft["life"] / 40.0) * 255))
@@ -1916,7 +1994,7 @@ def main():
 
             # Resumen post-combate mientras corre la pausa de sala superada
             if level_passed_timer > 0 and not editor_mode:
-                panel = pygame.Rect(0, 0, 560, 240)
+                panel = pygame.Rect(0, 0, 680, 240)
                 panel.center = (WIDTH // 2, HEIGHT // 2 - 20)
                 bg = pygame.Surface(panel.size, pygame.SRCALPHA)
                 bg.fill((12, 10, 20, 225))
@@ -2159,12 +2237,13 @@ def main():
         # Renderizar transición (el contador se decrementa en la simulación a 60 Hz)
         if save_indicator_timer > 0:
             # Fondo oscuro semitransparente
+            save_safe = get_visible_virtual_rect(real_screen.get_size(), aspect_mode)
             s = pygame.Surface((180, 50), pygame.SRCALPHA)
             s.fill((0, 0, 0, 100)) # Alpha mucho más transparente (antes 200)
-            screen.blit(s, (WIDTH - 200, HEIGHT - 70))
+            screen.blit(s, (save_safe.right - 200, save_safe.bottom - 70))
 
             # Círculo e icono (tamaño intermedio)
-            icon_x, icon_y = WIDTH - 170, HEIGHT - 45
+            icon_x, icon_y = save_safe.right - 170, save_safe.bottom - 45
             if SAVE_ICON_IMG:
                 scale_factor = 1.0 + 0.15 * abs(math.sin(save_indicator_timer * 0.1))
                 new_w = int(SAVE_ICON_IMG.get_width() * scale_factor)

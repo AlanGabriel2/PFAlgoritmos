@@ -59,6 +59,46 @@ class CollisionManager:
                 return collider
         return None
 
+    def sweep_collision(self, rect, dx, dy):
+        """Busca el primer sólido alcanzado por ``rect`` durante un movimiento.
+
+        El barrido usa la suma de Minkowski de dos rectángulos: se expanden los
+        obstáculos con el tamaño del móvil y se traza el centro de este entre la
+        posición inicial y la final. Esto evita que proyectiles rápidos atraviesen
+        paredes delgadas sin duplicar la resolución de movimiento de entidades.
+
+        Devuelve ``(collider, impact_rect)``. Si no hay impacto, ``collider`` es
+        ``None`` e ``impact_rect`` queda en la posición final.
+        """
+        probe = self._to_rect(rect)
+        start = probe.center
+        end = (int(round(start[0] + dx)), int(round(start[1] + dy)))
+
+        if dx == 0 and dy == 0:
+            return self.check_collision(probe), probe
+
+        nearest = None
+        nearest_point = None
+        nearest_distance = None
+        for collider in self._enabled_colliders():
+            expanded = collider.inflate(probe.width, probe.height)
+            clipped = expanded.clipline(start, end)
+            if not clipped:
+                continue
+            point = clipped[0]
+            distance = (point[0] - start[0]) ** 2 + (point[1] - start[1]) ** 2
+            if nearest_distance is None or distance < nearest_distance:
+                nearest = collider
+                nearest_point = point
+                nearest_distance = distance
+
+        if nearest is None:
+            probe.center = end
+            return None, probe
+
+        probe.center = nearest_point
+        return nearest, probe
+
     def get_collisions(self, rect):
         return [collider for collider in self._enabled_colliders() if rect.colliderect(collider)]
 

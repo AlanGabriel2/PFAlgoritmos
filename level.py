@@ -66,6 +66,7 @@ class Level:
     walkable_metadata: list = field(default_factory=list)
     character_scale: float = 1.0
     pathfinding_cell_size: int = 24
+    projectiles_collide_with_solids: bool = True
 
     @classmethod
     def from_dict(cls, data, fallback_size=(1280, 720)):
@@ -74,6 +75,7 @@ class Level:
         player_spawn = tuple(data.get("player_spawn", (size[0] // 2, size[1] // 2)))
         character_scale = float(data.get("character_scale", 0.7))
         pathfinding_cell_size = int(data.get("pathfinding_cell_size", 24))
+        projectiles_collide_with_solids = bool(data.get("projectiles_collide_with_solids", True))
 
         colliders = []
         collider_metadata = []
@@ -123,6 +125,7 @@ class Level:
             player_spawn=player_spawn,
             character_scale=character_scale,
             pathfinding_cell_size=pathfinding_cell_size,
+            projectiles_collide_with_solids=projectiles_collide_with_solids,
             colliders=colliders,
             collider_metadata=collider_metadata,
             hazard_zones=hazard_zones,
@@ -239,6 +242,7 @@ class Level:
         data["hazard_zones"] = new_hazards
         data["walkable_zones"] = new_walkables
         data["pathfinding_cell_size"] = int(self.pathfinding_cell_size)
+        data["projectiles_collide_with_solids"] = self.projectiles_collide_with_solids
         
         # Ensure directory exists
         path.parent.mkdir(parents=True, exist_ok=True)

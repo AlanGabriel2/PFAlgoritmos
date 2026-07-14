@@ -9,6 +9,10 @@ from animation_controller import AnimationClip, AnimationController
 # para que el proyectil coincida con el fotograma visual. Tuneable en juego.
 ATTACK_IMPACT_FRAME = 3
 
+# La hoja de caminar tiene seis poses diferenciadas. El ritmo pausado conserva
+# la lectura de cada apoyo sin alterar la posicion ni la hitbox del jugador.
+WALK_ANIMATION_SPEED = 0.07  # frames de sprite por tick de 60 Hz (~4.2 fps)
+
 font_bullet = None
 BULLET_0_IMG = None
 BULLET_1_IMG = None
@@ -57,7 +61,7 @@ class Player:
             "assets/images/player/player_sheet_normalized.png",
             int(96 * scale), int(96 * scale), rows=3, cols=4,
             animation_speed=0.10,
-            state_speeds={0: 0.06, 1: 0.16, 2: 0.52},
+            state_speeds={0: 0.06, 1: WALK_ANIMATION_SPEED, 2: 0.52},
         )
         self.animator.replace_state_from_sheet(
             0,
@@ -68,9 +72,9 @@ class Player:
         )
         self.animator.replace_state_from_sheet(
             1,
-            "assets/images/player/generated/player_walk_v3_alpha_master_normalized.png",
-            rows=2,
-            cols=4,
+            "assets/images/player/generated/player_walk_v6_alpha_master_normalized.png",
+            rows=1,
+            cols=6,
             frame_height=int(96 * scale),
         )
         self.animator.replace_state_from_sheet(
@@ -198,16 +202,33 @@ class Player:
         self.invuln_timer = 45  # 0.75 s: evita que varios enemigos drenen la vida en un frame
         return True
 
-    def update_bullets(self, width, height):
+    def update_bullets(self, width, height, collision_manager=None):
+        """Actualiza proyectiles y devuelve sus impactos contra sólidos.
+
+        La lista devuelta permite que la escena decida qué efecto visual mostrar,
+        mientras la detección sigue centralizada en ``CollisionManager``.
+        """
         if self.invuln_timer > 0:
             self.invuln_timer -= 1
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
 
+        impacts = []
         for b in self.bullets[:]:
-            b.update()
+            collider = b.update(collision_manager)
+            if collider is not None:
+                impacts.append({
+                    "x": b.x,
+                    "y": b.y,
+                    "dx": b.dx,
+                    "dy": b.dy,
+                    "collider": collider,
+                })
+                self.bullets.remove(b)
+                continue
             if b.is_offscreen(width, height):
                 self.bullets.remove(b)
+        return impacts
 
     def draw(self, surface, offset_x=0, offset_y=0):
         # El controller decide el clip (idle/move/attack) y emite el evento
@@ -248,9 +269,18 @@ class Bullet:
             self.text = random.choice(["0", "1"])
             self.color = (0, 255, 255) # Cyan color to match player
 
-    def update(self):
-        self.x += self.dx
-        self.y += self.dy
+    def update(self, collision_manager=None):
+        if collision_manager is None:
+            self.x += self.dx
+            self.y += self.dy
+            return None
+
+        rect = pygame.Rect(0, 0, self.radius * 2, self.radius * 2)
+        rect.center = (int(round(self.x)), int(round(self.y)))
+        collider, result_rect = collision_manager.sweep_collision(rect, self.dx, self.dy)
+        self.x = float(result_rect.centerx)
+        self.y = float(result_rect.centery)
+        return collider
 
     def draw(self, surface, offset_x=0, offset_y=0):
         if hasattr(self, 'image') and self.image:
